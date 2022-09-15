@@ -4,7 +4,7 @@
   - [ ] aynchronous communication with 0MQ
   - [ ] shards and replicas with 0MQ
   - [ ] FlatBuffers and FlexBuffers
-  - [ ] RocksDB
+  - [x] RocksDB
   - [ ] Kafka
 - [ ] EventStore API
   - [ ] CreateEvent
