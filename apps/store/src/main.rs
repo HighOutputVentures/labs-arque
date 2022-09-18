@@ -1,80 +1,93 @@
 use std::thread;
 use std::time::Duration;
+use tokio::sync::watch::{self, Receiver};
 
-async fn send_request() {
-  println!("request");
+async fn send_request(mut rec: Receiver<&'static str>) {
+    // TODO async request
+    let task = tokio::spawn(async move {
+        let ctx = zmq::Context::new();
 
-  // do something here;
+        let client = ctx.socket(zmq::REQ).unwrap();
+        client
+            .connect("tcp://localhost:5555")
+            .expect("failed to connect client");
 
-  println!("reply");
+        while rec.changed().await.is_ok() {
+            let value = *rec.borrow();
+            println!("receive from client task(channel): {}", value);
+            client.send(value, 0).unwrap();
+        }
+
+        let reply = client.recv_string(0).unwrap().unwrap();
+
+        println!("response from worker: {}", reply);
+    });
+
+    task.await.unwrap();
 }
 
 async fn client_task() {
-  // initialize channel
+    let (tx, rx) = watch::channel("sample");
 
-  tokio::spawn(async {
-    let ctx = zmq::Context::new();
+    let rx2 = rx.clone();
+    let rx3 = rx.clone();
+    let rx4 = rx.clone();
 
-    let client = ctx.socket(zmq::REQ).unwrap();
-    client.connect("tcp://localhost:5555").expect("failed to connect client");
-  
-    client.send("Hello", 0).unwrap();
-    let reply = client.recv_string(0).unwrap().unwrap();
-  
-    println!("reply: {}", reply);
-  });
+    let client = tokio::spawn(async move {
+        tx.send("Hello").unwrap();
+    });
 
-  let _ = tokio::join!(
-    send_request(),
-    send_request(),
-    send_request(),
-    send_request()
-  );
+    client.await.unwrap();
+
+    let _ = tokio::join!(
+        send_request(rx),
+        send_request(rx2),
+        send_request(rx3),
+        send_request(rx4)
+    );
 }
 
 async fn server_task() {
-  let ctx = zmq::Context::new();
+    let ctx = zmq::Context::new();
 
-  let router = ctx.socket(zmq::ROUTER).unwrap();
-  let dealer = ctx.socket(zmq::DEALER).unwrap();
+    let router = ctx.socket(zmq::ROUTER).unwrap();
+    let dealer = ctx.socket(zmq::DEALER).unwrap();
 
-  router.bind("tcp://*:5555").expect("failed to bind router");
-  dealer.bind("inproc://workers").expect("failed to bind dealer");
+    router.bind("tcp://*:5555").expect("failed to bind router");
+    dealer
+        .bind("inproc://workers")
+        .expect("failed to bind dealer");
 
-  for _ in 0..3 {
-    let ctx = ctx.clone();
-    thread::spawn(move || worker_task(&ctx));
-  }
+    for _ in 0..3 {
+        let ctx = ctx.clone();
+        thread::spawn(move || worker_task(&ctx));
+    }
 
-  zmq::proxy(&router, &dealer).expect("failed proxying");
+    zmq::proxy(&router, &dealer).expect("failed proxying");
 }
 
 fn worker_task(context: &zmq::Context) {
-  let worker = context.socket(zmq::REP).unwrap();
-  worker
-      .connect("inproc://workers")
-      .expect("failed to connect worker");
-
-  println!("worker started");
-
-  loop {
+    let worker = context.socket(zmq::REP).unwrap();
     worker
-      .recv_string(0)
-      .expect("worker failed receiving")
-      .unwrap();
-    thread::sleep(Duration::from_millis(1000));
-    worker.send("World", 0).unwrap();
-  }
+        .connect("inproc://workers")
+        .expect("failed to connect worker");
+
+    println!("worker started");
+
+    loop {
+        let data = worker
+            .recv_string(0)
+            .expect("worker failed receiving")
+            .unwrap();
+        println!("received from client: {}", data);
+        thread::sleep(Duration::from_millis(1000));
+        worker.send("World", 0).unwrap();
+    }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-  let _ = tokio::join!(
-    tokio::spawn(server_task()),
-    tokio::spawn(client_task()),
-    tokio::spawn(client_task()),
-    tokio::spawn(client_task())
-  );
-  
-  Ok(())
+    let _ = tokio::join!(tokio::spawn(server_task()), tokio::spawn(client_task()),);
+
+    Ok(())
 }
