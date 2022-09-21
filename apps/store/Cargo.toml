@@ -5,4 +5,7 @@ edition = "2021"
 
 [dependencies]
 zmq = "0.9"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1.0", features = ["full"] }
+custom_error = "1.9"
+rocksdb = "0.19"
+arque_common = { path = "../../lib/common" }

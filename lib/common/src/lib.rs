@@ -1,4 +1,1 @@
-pub struct Event {
-  id: [u8; 12],
-  version: u8,
-}
+pub mod event_generated;
