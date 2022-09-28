@@ -2,7 +2,6 @@ table Event {
   id:[ubyte];
   type:uint16;
   timestamp:uint32;
-  version:ubyte;
   aggregate_id:[ubyte];
   aggregate_version:uint32;
   body:[ubyte];

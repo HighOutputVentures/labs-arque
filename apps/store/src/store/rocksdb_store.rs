@@ -1,5 +1,5 @@
 use rocksdb::{Error, DB};
-
+use arque_common::event_generated::Event;
 use super::InsertEventError;
 
 pub struct RocksDBStore {
@@ -13,7 +13,17 @@ impl RocksDBStore {
     Ok(RocksDBStore { db })
   }
 
-  fn insert_event(&self) -> Result<(), InsertEventError> {
+  fn insert_event(&self, event: &Event) -> Result<(), InsertEventError> {
+    event.aggregate_id();
+
+  // events
+  //   key: event id
+  //   value: event
+  
+  // aggregate_events
+  //   key: aggregate_id + aggregate_version
+  //   value: event id
+
     Ok(())
   }
 
@@ -21,3 +31,4 @@ impl RocksDBStore {
     Ok(())
   }
 }
+

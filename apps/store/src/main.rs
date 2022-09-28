@@ -1,4 +1,5 @@
 mod store;
+mod client;
 
 use std::thread;
 use std::time::Duration;
@@ -83,7 +84,9 @@ fn worker_task(context: &zmq::Context) {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let _ = tokio::join!(tokio::spawn(server_task()), tokio::spawn(client_task()),);
+  thread::spawn(|| {
+    server_task()
+  }).join().unwrap();
 
-    Ok(())
+  Ok(())
 }
