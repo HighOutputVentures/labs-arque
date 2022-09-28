@@ -1,7 +1,9 @@
 mod store;
+mod client;
 
 use std::thread;
 use std::time::Duration;
+use client::Client;
 use tokio::sync::watch::{self, Receiver};
 
 async fn send_request(mut rec: Receiver<&'static str>) {
@@ -10,6 +12,7 @@ async fn send_request(mut rec: Receiver<&'static str>) {
     let ctx = zmq::Context::new();
 
     let client = ctx.socket(zmq::REQ).unwrap();
+
     client
       .connect("tcp://localhost:5555")
       .expect("failed to connect client");
@@ -35,6 +38,12 @@ async fn client_task() {
   let rx3 = rx.clone();
   let rx4 = rx.clone();
 
+  // run the client thread
+  // open a DEALER socket
+  // start an infinite loop
+  // - receive requests from tx
+  // - send requests through the DEALER
+
   let client = tokio::spawn(async move {
     tx.send("Hello").unwrap();
   });
@@ -49,23 +58,42 @@ async fn client_task() {
   );
 }
 
-async fn server_task() {
+async fn client_task_new() {
+  Client::connect("tcp://localhost:5555").await.unwrap();
+}
+
+fn server_task() {
   let ctx = zmq::Context::new();
 
-  let router = ctx.socket(zmq::ROUTER).unwrap();
-  let dealer = ctx.socket(zmq::DEALER).unwrap();
+  let worker = ctx.socket(zmq::REP).unwrap();
+  worker
+    .bind("tcp://*:5555")
+    .expect("failed to connect worker");
 
-  router.bind("tcp://*:5555").expect("failed to bind router");
-  dealer
-    .bind("inproc://workers")
-    .expect("failed to bind dealer");
-
-  for _ in 0..3 {
-    let ctx = ctx.clone();
-    thread::spawn(move || worker_task(&ctx));
+  loop {
+    let data = worker
+      .recv_string(0)
+      .expect("worker failed receiving")
+      .unwrap();
+    println!("received from client: {}", data);
+    thread::sleep(Duration::from_millis(1000));
+    worker.send("World", 0).unwrap();
   }
 
-  zmq::proxy(&router, &dealer).expect("failed proxying");
+  // let router = ctx.socket(zmq::ROUTER).unwrap();
+  // let dealer = ctx.socket(zmq::DEALER).unwrap();
+
+  // router.bind("tcp://*:5555").expect("failed to bind router");
+  // dealer
+  //   .bind("inproc://workers")
+  //   .expect("failed to bind dealer");
+
+  // for _ in 0..3 {
+  //   let ctx = ctx.clone();
+  //   thread::spawn(move || worker_task(&ctx));
+  // }
+
+  // zmq::proxy(&router, &dealer).expect("failed proxying");
 }
 
 fn worker_task(context: &zmq::Context) {
@@ -89,12 +117,13 @@ fn worker_task(context: &zmq::Context) {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-  let _ = tokio::join!(
-    tokio::spawn(server_task()),
-    tokio::spawn(client_task()),
-    tokio::spawn(client_task()),
-    tokio::spawn(client_task()),
-  );
+  thread::spawn(|| {
+    client_task_new()
+  });
+
+  thread::spawn(|| {
+    server_task()
+  }).join().unwrap();
 
   Ok(())
 }
