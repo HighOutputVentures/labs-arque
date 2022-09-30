@@ -9,3 +9,16 @@ tokio = { version = "1.0", features = ["full"] }
 custom_error = "1.9"
 rocksdb = "0.19"
 arque_common = { path = "../../lib/common" }
+chrono = "0.4"
+
+[dependencies.uuid]
+version = "1.1.2"
+features = [
+    "v4",                
+    "fast-rng",         
+    "macro-diagnostics", 
+]
+
+[[bin]]
+name = "rocksdb"
+path = "./src/store/rocksdb_store.rs"
