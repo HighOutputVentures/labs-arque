@@ -22,3 +22,6 @@ features = [
 [[bin]]
 name = "rocksdb"
 path = "./src/store/rocksdb_store.rs"
+
+[dev-dependencies]
+tokio-test = "*"
