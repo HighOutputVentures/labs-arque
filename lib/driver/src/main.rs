@@ -43,11 +43,13 @@ fn main() {
     .build()
     .unwrap()
     .block_on(async {
-      let mut client = Client::connect("tcp://localhost:5555").unwrap();
+      let client = Client::connect("tcp://localhost:5555").unwrap();
 
       let mut handles = vec![];
 
-      handles.push(client.send("message 0"));
+      for i in 0..20 {
+        handles.push(client.send(format!("message {}", i)));
+      }
 
       futures::future::join_all(handles).await;
     });
