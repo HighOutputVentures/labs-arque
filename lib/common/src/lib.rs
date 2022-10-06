@@ -12,7 +12,7 @@ pub struct EventArgsType {
     pub version: u8,
 }
 
-pub fn event_to_fb(event_args: EventArgsType, bytes: &mut Vec<u8>) {
+pub fn event_to_fb(event_args: EventArgsType) -> Vec<u8> {
     let mut bldr = FlatBufferBuilder::new();
 
     bldr.reset();
@@ -32,8 +32,7 @@ pub fn event_to_fb(event_args: EventArgsType, bytes: &mut Vec<u8>) {
 
     finish_event_buffer(&mut bldr, event_data);
 
-    let data = bldr.finished_data();
-    bytes.extend_from_slice(data);
+    return bldr.finished_data().to_owned();
 }
 
 pub fn event_to_event_args(event: Event) -> EventArgsType {

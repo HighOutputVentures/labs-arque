@@ -1,12 +1,14 @@
 use std::{thread, sync::mpsc::channel};
 
+#[allow(dead_code, unused_variables)]
+
 pub struct Client {}
 
 impl Client {
-  pub async fn connect(endpoint: &str) -> Result<Client, Box<dyn std::error::Error>> {
+  pub async fn _connect(endpoint: &str) -> Result<Client, Box<dyn std::error::Error>> {
     let endpoint = endpoint.to_owned();
 
-    let (tx, rx) = channel::<i32>();
+    let (_tx, rx) = channel::<i32>();
 
     thread::spawn(move || {
       let ctx = zmq::Context::new();
@@ -29,5 +31,5 @@ impl Client {
     Ok(Client {})
   }
 
-  pub async fn send(&self, value: i32) {}
+  pub async fn _send(&self, _value: i32) {}
 }

@@ -4,6 +4,8 @@ mod client;
 use std::thread;
 use std::time::Duration;
 
+#[allow(dead_code, unused_variables)]
+
 // async fn send_request(mut rec: Receiver<&'static str>) {}
 
 async fn client_task() {
@@ -84,7 +86,7 @@ fn worker_task(context: &zmq::Context) {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-  thread::spawn(|| {
+  let _ = thread::spawn(|| {
     server_task()
   }).join().unwrap();
 
