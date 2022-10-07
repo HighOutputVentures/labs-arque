@@ -10,7 +10,7 @@
   - [ ] CreateEvent
   - [ ] ListEvents
   - [ ] RegisterProjection
-- [ ] EventStore Driver
+- [ ] EventStore Driver (Rust)
 - [ ] NodeJS Client
   - [ ] Aggregate
   - [ ] Projection

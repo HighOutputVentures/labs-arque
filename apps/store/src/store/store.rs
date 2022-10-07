@@ -8,5 +8,5 @@ custom_error!{pub InsertEventError
 
 pub trait Store {
   fn insert_event(event: &Event) -> Result<(), InsertEventError>;
-  fn list_aggregate_events(&self) -> Result<(), Error>;
+  fn list_aggregate_events(&self) -> Result<(), Error>; 
 }
