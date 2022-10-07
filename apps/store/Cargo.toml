@@ -19,9 +19,10 @@ features = [
     "macro-diagnostics", 
 ]
 
+[dev-dependencies]
+rstest = "0.15.0"
+
+
 [[bin]]
 name = "rocksdb"
 path = "./src/store/rocksdb_store.rs"
-
-[dev-dependencies]
-tokio-test = "*"
