@@ -13,6 +13,8 @@ use chrono::Local;
 
 use uuid::Uuid;
 
+use byteorder::{BigEndian, ByteOrder};
+
 use crate::store::InsertEventError;
 
 pub struct RocksDBStore {
@@ -20,7 +22,11 @@ pub struct RocksDBStore {
 }
 
 impl RocksDBStore {
-    fn open(path: &str, db_opts: &Options) -> Result<Self, Error> {
+    fn open(path: &str) -> Result<Self, Error> {
+        let mut db_opts = Options::default();
+        db_opts.create_missing_column_families(true);
+        db_opts.create_if_missing(true);
+
         let db = DB::open_cf(
             &db_opts,
             path,
@@ -43,12 +49,7 @@ impl RocksDBStore {
             Ok(Some(aggregate_version)) => {
                 if event
                     .aggregate_version()
-                    .ne(&(String::from_utf8(aggregate_version.to_vec())
-                        .unwrap()
-                        .to_string()
-                        .parse::<u32>()
-                        .unwrap()
-                        + 1))
+                    .ne(&(BigEndian::read_u32(&aggregate_version.to_vec()) + 1))
                 {
                     return Err(InsertEventError::InvalidAggregateVersion);
                 }
@@ -62,7 +63,7 @@ impl RocksDBStore {
             cf2,
             [
                 event.aggregate_id().unwrap(),
-                event.aggregate_version().to_string().as_bytes(),
+                &event.aggregate_version().to_be_bytes(),
             ]
             .concat(),
             event.id().unwrap(),
@@ -70,7 +71,7 @@ impl RocksDBStore {
         batch.put_cf(
             cf3,
             event.aggregate_id().unwrap(),
-            event.aggregate_version().to_string().as_bytes(),
+            event.aggregate_version().to_be_bytes(),
         );
 
         self.db.write(batch).expect("failed to write");
@@ -83,36 +84,30 @@ impl RocksDBStore {
         Ok(())
     }
 
-    fn close(path: &str, db_opts: &Options) {
+    fn close(path: &str) {
+        let mut db_opts = Options::default();
+        db_opts.create_missing_column_families(true);
+        db_opts.create_if_missing(true);
+
         DB::destroy(&db_opts, path).expect("failed to close");
     }
 }
 
 #[cfg(test)]
 mod tests {
-    // use std::time::Duration;
-
+    use super::*;
     use rstest::*;
 
-    use super::*;
-
     #[fixture]
-    #[once]
-    fn open_db() -> RocksDBStore {
-        let mut db_opts = Options::default();
-        db_opts.create_missing_column_families(true);
-        db_opts.create_if_missing(true);
-
-        let path = "./src/db";
-
-        let db = RocksDBStore::open(path, &db_opts).unwrap();
+    fn open_db(#[default("./src/db")] path: &str) -> RocksDBStore {
+        let db = RocksDBStore::open(path).unwrap();
 
         db
     }
 
     #[rstest]
     #[tokio::test]
-    async fn create_column_families_test() {
+    async fn create_column_families_test(_open_db: RocksDBStore) {
         let data = DB::list_cf(&Options::default(), "./src/db").unwrap();
         assert_eq!(
             data,
@@ -122,7 +117,7 @@ mod tests {
 
     #[rstest]
     #[tokio::test]
-    async fn insert_event_test(open_db: &RocksDBStore) {
+    async fn insert_event_test(#[with("./src/db1")] open_db: RocksDBStore) {
         let args = EventArgsType {
             id: Uuid::new_v4().as_bytes().to_vec(),
             type_: 1,
@@ -146,13 +141,13 @@ mod tests {
     #[rstest]
     #[tokio::test]
     #[should_panic(expected = "failed to save event: InvalidAggregateVersion")]
-    async fn insert_event_error_test(open_db: &RocksDBStore) {
+    async fn insert_event_error_test(#[with("./src/db2")] open_db: RocksDBStore) {
         let args = EventArgsType {
             id: Uuid::new_v4().as_bytes().to_vec(),
             type_: 1,
             timestamp: Local::now().timestamp() as u32,
             aggregate_id: Uuid::new_v4().as_bytes().to_vec(),
-            aggregate_version: 2,
+            aggregate_version: 2000000,
             body: Uuid::new_v4().as_bytes().to_vec(),
             metadata: Uuid::new_v4().as_bytes().to_vec(),
             version: 2,
@@ -172,15 +167,14 @@ mod tests {
     }
 
     // #[rstest]
-    // #[timeout(Duration::from_millis(5000))]
     // #[tokio::test]
     // async fn close_db_test() {
-    //     let mut db_opts = Options::default();
-    //     db_opts.create_missing_column_families(true);
-    //     db_opts.create_if_missing(true);
+    //     let path1 = "./src/db";
+    //     let path2 = "./src/db1";
+    //     let path3 = "./src/db2";
 
-    //     let path = "./src/db";
-
-    //     RocksDBStore::close(path, &db_opts);
+    //     RocksDBStore::close(path1);
+    //     RocksDBStore::close(path2);
+    //     RocksDBStore::close(path3);
     // }
 }
