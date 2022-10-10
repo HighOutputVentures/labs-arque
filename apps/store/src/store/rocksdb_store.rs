@@ -13,6 +13,8 @@ use chrono::Local;
 
 use uuid::Uuid;
 
+use byteorder::{BigEndian, ByteOrder};
+
 use crate::store::InsertEventError;
 
 pub struct RocksDBStore {
@@ -20,7 +22,11 @@ pub struct RocksDBStore {
 }
 
 impl RocksDBStore {
-    fn open(path: &str, db_opts: &Options) -> Result<Self, Error> {
+    fn open(path: &str) -> Result<Self, Error> {
+        let mut db_opts = Options::default();
+        db_opts.create_missing_column_families(true);
+        db_opts.create_if_missing(true);
+
         let db = DB::open_cf(
             &db_opts,
             path,
@@ -43,12 +49,7 @@ impl RocksDBStore {
             Ok(Some(aggregate_version)) => {
                 if event
                     .aggregate_version()
-                    .ne(&(String::from_utf8(aggregate_version.to_vec())
-                        .unwrap()
-                        .to_string()
-                        .parse::<u32>()
-                        .unwrap()
-                        + 1))
+                    .ne(&(BigEndian::read_u32(&aggregate_version.to_vec()) + 1))
                 {
                     return Err(InsertEventError::InvalidAggregateVersion);
                 }
@@ -62,7 +63,7 @@ impl RocksDBStore {
             cf2,
             [
                 event.aggregate_id().unwrap(),
-                event.aggregate_version().to_string().as_bytes(),
+                &event.aggregate_version().to_be_bytes(),
             ]
             .concat(),
             event.id().unwrap(),
@@ -70,7 +71,7 @@ impl RocksDBStore {
         batch.put_cf(
             cf3,
             event.aggregate_id().unwrap(),
-            event.aggregate_version().to_string().as_bytes(),
+            event.aggregate_version().to_be_bytes(),
         );
 
         self.db.write(batch).expect("failed to write");
@@ -79,40 +80,73 @@ impl RocksDBStore {
         Ok(())
     }
 
-    fn list_aggregate_events(&self) -> Result<(), Error> {
+    fn list_aggregate_events(&self, aggregate_id: &[u8]) -> Result<(), Error> {
+        let cf1 = self.db.cf_handle("events").unwrap();
+        let cf2 = self.db.cf_handle("aggregate_events").unwrap();
+        let cf3 = self.db.cf_handle("aggregate_version").unwrap();
+
+        let aggregate_version = self.db.get_pinned_cf(cf3, aggregate_id);
+        let mut event_ids = Vec::new();
+
+        for version_number in
+            1..BigEndian::read_u32(&aggregate_version.unwrap().unwrap().to_vec()) + 1
+        {
+            let event_id = self
+                .db
+                .get_pinned_cf(cf2, [aggregate_id, &version_number.to_be_bytes()].concat());
+            event_ids.push(event_id.unwrap().unwrap().to_vec());
+        }
+
+        let event_data = self.db.batched_multi_get_cf(cf1, event_ids, true);
+
+        for data in event_data {
+            println!("value {:?}", data.unwrap().unwrap().to_vec())
+        }
+
+        println!("query successfull");
         Ok(())
     }
 
-    fn close(path: &str, db_opts: &Options) {
+    fn close(path: &str) {
+        let mut db_opts = Options::default();
+        db_opts.create_missing_column_families(true);
+        db_opts.create_if_missing(true);
+
         DB::destroy(&db_opts, path).expect("failed to close");
     }
 }
 
 #[cfg(test)]
 mod tests {
-    // use std::time::Duration;
-
+    use super::*;
     use rstest::*;
 
-    use super::*;
+    #[fixture]
+    fn generate_fake_event_args(#[default(1)] aggregate_version: u32) -> EventArgsType {
+        let event_args = EventArgsType {
+            id: Uuid::new_v4().as_bytes().to_vec(),
+            type_: 1,
+            timestamp: Local::now().timestamp() as u32,
+            aggregate_id: Uuid::new_v4().as_bytes().to_vec(),
+            aggregate_version,
+            body: Uuid::new_v4().as_bytes().to_vec(),
+            metadata: Uuid::new_v4().as_bytes().to_vec(),
+            version: 1,
+        };
+
+        event_args
+    }
 
     #[fixture]
-    #[once]
-    fn open_db() -> RocksDBStore {
-        let mut db_opts = Options::default();
-        db_opts.create_missing_column_families(true);
-        db_opts.create_if_missing(true);
-
-        let path = "./src/db";
-
-        let db = RocksDBStore::open(path, &db_opts).unwrap();
+    fn open_db(#[default("./src/db")] path: &str) -> RocksDBStore {
+        let db = RocksDBStore::open(path).unwrap();
 
         db
     }
 
     #[rstest]
     #[tokio::test]
-    async fn create_column_families_test() {
+    async fn create_column_families_test(_open_db: RocksDBStore) {
         let data = DB::list_cf(&Options::default(), "./src/db").unwrap();
         assert_eq!(
             data,
@@ -122,19 +156,11 @@ mod tests {
 
     #[rstest]
     #[tokio::test]
-    async fn insert_event_test(open_db: &RocksDBStore) {
-        let args = EventArgsType {
-            id: Uuid::new_v4().as_bytes().to_vec(),
-            type_: 1,
-            timestamp: Local::now().timestamp() as u32,
-            aggregate_id: Uuid::new_v4().as_bytes().to_vec(),
-            aggregate_version: 1,
-            body: Uuid::new_v4().as_bytes().to_vec(),
-            metadata: Uuid::new_v4().as_bytes().to_vec(),
-            version: 1,
-        };
-
-        let fb_event_data_bytes = event_to_fb(args);
+    async fn insert_event_test(
+        #[with("./src/db1")] open_db: RocksDBStore,
+        generate_fake_event_args: EventArgsType,
+    ) {
+        let fb_event_data_bytes = event_to_fb(generate_fake_event_args);
 
         open_db
             .insert_event(&fb_to_event(&fb_event_data_bytes))
@@ -146,19 +172,11 @@ mod tests {
     #[rstest]
     #[tokio::test]
     #[should_panic(expected = "failed to save event: InvalidAggregateVersion")]
-    async fn insert_event_error_test(open_db: &RocksDBStore) {
-        let args = EventArgsType {
-            id: Uuid::new_v4().as_bytes().to_vec(),
-            type_: 1,
-            timestamp: Local::now().timestamp() as u32,
-            aggregate_id: Uuid::new_v4().as_bytes().to_vec(),
-            aggregate_version: 2,
-            body: Uuid::new_v4().as_bytes().to_vec(),
-            metadata: Uuid::new_v4().as_bytes().to_vec(),
-            version: 2,
-        };
-
-        let fb_event_data_bytes = event_to_fb(args);
+    async fn insert_event_error_test(
+        #[with("./src/db2")] open_db: RocksDBStore,
+        #[with(2000000)] generate_fake_event_args: EventArgsType,
+    ) {
+        let fb_event_data_bytes = event_to_fb(generate_fake_event_args);
 
         open_db
             .insert_event(&fb_to_event(&fb_event_data_bytes))
@@ -171,16 +189,42 @@ mod tests {
         open_db.db.flush().expect("failed to flush");
     }
 
+    #[rstest]
+    #[tokio::test]
+    async fn list_aggregate_events_test(#[with("./src/db3")] open_db: RocksDBStore) {
+        let aggregate_id = Uuid::new_v4();
+
+        for i in 1..11 {
+            let args = EventArgsType {
+                aggregate_id: aggregate_id.as_bytes().to_vec(),
+                ..generate_fake_event_args(i)
+            };
+
+            let fb_event_data_bytes = event_to_fb(args);
+
+            open_db
+                .insert_event(&fb_to_event(&fb_event_data_bytes))
+                .expect("failed to save event");
+        }
+
+        open_db
+            .list_aggregate_events(&aggregate_id.as_bytes().to_vec())
+            .expect("failed to query");
+
+        open_db.db.flush().expect("failed to flush");
+    }
+
     // #[rstest]
-    // #[timeout(Duration::from_millis(5000))]
     // #[tokio::test]
     // async fn close_db_test() {
-    //     let mut db_opts = Options::default();
-    //     db_opts.create_missing_column_families(true);
-    //     db_opts.create_if_missing(true);
+    //     let path1 = "./src/db";
+    //     let path2 = "./src/db1";
+    //     let path3 = "./src/db2";
+    //     let path4 = "./src/db3";
 
-    //     let path = "./src/db";
-
-    //     RocksDBStore::close(path, &db_opts);
+    //     RocksDBStore::close(path1);
+    //     RocksDBStore::close(path2);
+    //     RocksDBStore::close(path3);
+    //     RocksDBStore::close(path4);
     // }
 }
