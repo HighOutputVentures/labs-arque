@@ -195,7 +195,6 @@ mod tests {
         let aggregate_id = Uuid::new_v4();
 
         for i in 1..11 {
-            println!("{}", i);
             let args = EventArgsType {
                 aggregate_id: aggregate_id.as_bytes().to_vec(),
                 ..generate_fake_event_args(i)
