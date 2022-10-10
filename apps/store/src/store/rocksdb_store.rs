@@ -75,7 +75,7 @@ impl RocksDBStore {
         );
 
         self.db.write(batch).expect("failed to write");
-        
+
         println!("event saved!");
         Ok(())
     }
@@ -83,21 +83,20 @@ impl RocksDBStore {
     fn list_aggregate_events(&self, aggregate_id: &[u8]) -> Result<(), Error> {
         let cf1 = self.db.cf_handle("events").unwrap();
         let cf2 = self.db.cf_handle("aggregate_events").unwrap();
-        let cf3 = self.db.cf_handle("aggregate_version").unwrap();
 
-        let aggregate_version = self.db.get_pinned_cf(cf3, aggregate_id);
-        let mut event_ids = Vec::new();
+        let events_ids = self
+            .db
+            .iterator_cf(
+                cf2,
+                rocksdb::IteratorMode::From(
+                    &[aggregate_id, &1_u32.to_be_bytes()].concat(),
+                    rocksdb::Direction::Forward,
+                ),
+            )
+            .map(|aggregate_events_key| aggregate_events_key.unwrap().1.to_vec())
+            .collect::<Vec<_>>();
 
-        for version_number in
-            1..BigEndian::read_u32(&aggregate_version.unwrap().unwrap().to_vec()) + 1
-        {
-            let event_id = self
-                .db
-                .get_pinned_cf(cf2, [aggregate_id, &version_number.to_be_bytes()].concat());
-            event_ids.push(event_id.unwrap().unwrap().to_vec());
-        }
-
-        let event_data = self.db.batched_multi_get_cf(cf1, event_ids, true);
+        let event_data = self.db.batched_multi_get_cf(cf1, events_ids, true);
 
         for data in event_data {
             println!("value {:?}", data.unwrap().unwrap().to_vec())
