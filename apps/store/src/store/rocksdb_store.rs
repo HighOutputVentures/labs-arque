@@ -74,7 +74,7 @@ impl RocksDBStore {
         );
 
         self.db.write(batch).expect("failed to write");
-
+        
         println!("event saved!");
         Ok(())
     }

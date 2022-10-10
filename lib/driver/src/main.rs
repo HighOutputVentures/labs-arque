@@ -47,7 +47,7 @@ fn main() {
 
       let mut handles = vec![];
 
-      for i in 0..20 {
+      for i in 0..2 {
         handles.push(client.send(format!("message {}", i)));
       }
 
