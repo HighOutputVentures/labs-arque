@@ -8,7 +8,8 @@ custom_error!{pub InsertEventError
 
 pub struct ListAggregateEventsParams<'a> {
   aggregate_id: &'a [u8],
-  aggregate_version: Option<u32>
+  aggregate_version: Option<u32>,
+  limit: u32,
 }
 
 pub trait Store {
