@@ -14,6 +14,8 @@ pub struct ListAggregateEventsParams<'a> {
 
 pub trait Store {
     fn insert_event(&self, event: &Event) -> Result<(), InsertEventError>;
-    fn list_aggregate_events(&self, params: ListAggregateEventsParams)
-        -> Result<Vec<Event>, Error>;
+    fn list_aggregate_events(
+        &self,
+        params: ListAggregateEventsParams,
+    ) -> Result<Vec<Vec<u8>>, Error>;
 }

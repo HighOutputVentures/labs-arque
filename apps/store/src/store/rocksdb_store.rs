@@ -2,7 +2,6 @@ mod store;
 
 use arque_common::event_args_to_fb;
 use arque_common::event_generated::Event;
-use arque_common::event_generated::root_as_event;
 use arque_common::event_to_event_args;
 use arque_common::fb_to_event;
 use arque_common::EventArgsType;
@@ -32,6 +31,14 @@ fn open(path: &str) -> Result<RocksDBStore, Error> {
 
     Ok(RocksDBStore { db })
 }
+
+// fn close(path: &str) {
+//     let mut db_opts = Options::default();
+//     db_opts.create_missing_column_families(true);
+//     db_opts.create_if_missing(true);
+
+//     DB::destroy(&db_opts, path).expect("failed to close");
+// }
 
 pub struct RocksDBStore {
     db: DB,
@@ -78,14 +85,13 @@ impl Store for RocksDBStore {
 
         self.db.write(batch).expect("failed to write");
 
-        println!("event saved!");
         Ok(())
     }
 
     fn list_aggregate_events(
         &self,
         params: ListAggregateEventsParams,
-    ) -> Result<Vec<Event>, Error> {
+    ) -> Result<Vec<Vec<u8>>, Error> {
         let cf1 = self.db.cf_handle("events").unwrap();
         let cf2 = self.db.cf_handle("aggregate_events").unwrap();
 
@@ -118,30 +124,17 @@ impl Store for RocksDBStore {
 
         let event_data = self.db.batched_multi_get_cf(cf1, event_ids, true);
 
-        let mut events = Vec::new();
-        let mut eventss = Vec::new();
+        let events = event_data
+            .into_iter()
+            .map(|data| data.unwrap().unwrap().to_owned())
+            .collect::<Vec<Vec<u8>>>();
 
-        for data in event_data {
-            events.push(data.unwrap().unwrap().to_owned())
-        }
-
-        eventss.push(root_as_event(&events[0]).unwrap());
-        Ok(eventss)
+        Ok(events)
     }
-
-    // fn close(path: &str) {
-    //     let mut db_opts = Options::default();
-    //     db_opts.create_missing_column_families(true);
-    //     db_opts.create_if_missing(true);
-
-    //     DB::destroy(&db_opts, path).expect("failed to close");
-    // }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::ops::Deref;
-
     use super::*;
     use rstest::*;
 
@@ -239,12 +232,12 @@ mod tests {
             .list_aggregate_events(list_aggregate_events_params)
             .expect("failed to query");
 
-        // let events = event_data
-        //     .iter()
-        //     .map(|data| fb_to_event(data.deref()))
-        //     .collect::<Vec<Event>>();
+        let events = event_data
+            .iter()
+            .map(|data| fb_to_event(data))
+            .collect::<Vec<Event>>();
 
-        assert_eq!(event_data.len(), 10);
+        assert_eq!(events.len(), 10);
 
         open_db.db.flush().expect("failed to flush");
     }
@@ -254,10 +247,10 @@ mod tests {
     async fn list_aggregate_events_test_2(#[with("./src/db4")] open_db: RocksDBStore) {
         let aggregate_id = Uuid::new_v4();
 
-        for i in 0..40 {
+        for i in 0..20 {
             let mut args = generate_fake_event_args(i);
 
-            if i >= 10 && i < 20 {
+            if i >= 10 && i < 15 {
                 args = EventArgsType {
                     aggregate_id: aggregate_id.as_bytes().to_vec(),
                     ..generate_fake_event_args(i)
@@ -281,12 +274,12 @@ mod tests {
             .list_aggregate_events(list_aggregate_events_params)
             .expect("failed to query");
 
-        // let events = event_data
-        //     .iter()
-        //     .map(|data| fb_to_event(data.deref()))
-        //     .collect::<Vec<Event>>();
+        let events = event_data
+            .iter()
+            .map(|data| fb_to_event(data))
+            .collect::<Vec<Event>>();
 
-        assert_eq!(event_data.len(), 10);
+        assert_eq!(events.len(), 5);
 
         open_db.db.flush().expect("failed to flush");
     }
@@ -300,10 +293,10 @@ mod tests {
     //     let path4 = "./src/db3";
     //     let path5 = "./src/db4";
 
-    //     RocksDBStore::close(path1);
-    //     RocksDBStore::close(path2);
-    //     RocksDBStore::close(path3);
-    //     RocksDBStore::close(path4);
-    //     RocksDBStore::close(path5);
+    //     close(path1);
+    //     close(path2);
+    //     close(path3);
+    //     close(path4);
+    //     close(path5);
     // }
 }

@@ -32,11 +32,11 @@ pub fn event_args_to_fb(event_args: EventArgsType) -> Vec<u8> {
 
     finish_event_buffer(&mut bldr, event_data);
 
-    return bldr.finished_data().to_owned();
+    bldr.finished_data().to_owned()
 }
 
 pub fn event_to_event_args(event: Event) -> EventArgsType {
-    return EventArgsType {
+    EventArgsType {
         id: event.id().unwrap().to_vec(),
         type_: event.type_(),
         timestamp: event.timestamp(),
@@ -45,11 +45,11 @@ pub fn event_to_event_args(event: Event) -> EventArgsType {
         body: event.body().unwrap().to_vec(),
         metadata: event.metadata().unwrap().to_vec(),
         version: event.version(),
-    };
+    }
 }
 
 pub fn fb_to_event(buf: &[u8]) -> Event {
-    return root_as_event(buf).expect("failed to verify event");
+    root_as_event(buf).expect("failed to verify event")
 }
 
 pub mod event_generated;
