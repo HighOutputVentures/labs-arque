@@ -1,8 +1,9 @@
 mod store;
 
+use arque_common::event_args_to_fb;
 use arque_common::event_generated::Event;
+use arque_common::event_generated::root_as_event;
 use arque_common::event_to_event_args;
-use arque_common::event_to_fb;
 use arque_common::fb_to_event;
 use arque_common::EventArgsType;
 
@@ -15,31 +16,32 @@ use uuid::Uuid;
 
 use byteorder::{BigEndian, ByteOrder};
 
+use crate::store::Store;
 use crate::store::{InsertEventError, ListAggregateEventsParams};
+
+fn open(path: &str) -> Result<RocksDBStore, Error> {
+    let mut db_opts = Options::default();
+    db_opts.create_missing_column_families(true);
+    db_opts.create_if_missing(true);
+
+    let db = DB::open_cf(
+        &db_opts,
+        path,
+        vec!["events", "aggregate_events", "aggregate_version"],
+    )?;
+
+    Ok(RocksDBStore { db })
+}
 
 pub struct RocksDBStore {
     db: DB,
 }
 
-impl RocksDBStore {
-    fn open(path: &str) -> Result<Self, Error> {
-        let mut db_opts = Options::default();
-        db_opts.create_missing_column_families(true);
-        db_opts.create_if_missing(true);
-
-        let db = DB::open_cf(
-            &db_opts,
-            path,
-            vec!["events", "aggregate_events", "aggregate_version"],
-        )?;
-
-        Ok(RocksDBStore { db })
-    }
-
+impl Store for RocksDBStore {
     fn insert_event(&self, event: &Event) -> Result<(), InsertEventError> {
         let mut batch = WriteBatch::default();
 
-        let fb_event_data_bytes = event_to_fb(event_to_event_args(*event));
+        let fb_event_data_bytes = event_args_to_fb(event_to_event_args(*event));
 
         let cf1 = self.db.cf_handle("events").unwrap();
         let cf2 = self.db.cf_handle("aggregate_events").unwrap();
@@ -49,7 +51,7 @@ impl RocksDBStore {
             Ok(Some(aggregate_version)) => {
                 if event
                     .aggregate_version()
-                    .ne(&(BigEndian::read_u32(&aggregate_version.to_vec()) + 1))
+                    .ne(&(BigEndian::read_u32(&aggregate_version) + 1))
                 {
                     return Err(InsertEventError::InvalidAggregateVersion);
                 }
@@ -80,7 +82,10 @@ impl RocksDBStore {
         Ok(())
     }
 
-    fn list_aggregate_events(&self, params: ListAggregateEventsParams) -> Result<(), Error> {
+    fn list_aggregate_events(
+        &self,
+        params: ListAggregateEventsParams,
+    ) -> Result<Vec<Event>, Error> {
         let cf1 = self.db.cf_handle("events").unwrap();
         let cf2 = self.db.cf_handle("aggregate_events").unwrap();
 
@@ -111,29 +116,32 @@ impl RocksDBStore {
             })
             .collect::<Vec<_>>();
 
-        assert_eq!(event_ids.len(), 10);
-
         let event_data = self.db.batched_multi_get_cf(cf1, event_ids, true);
 
+        let mut events = Vec::new();
+        let mut eventss = Vec::new();
+
         for data in event_data {
-            println!("value {:?}", data.unwrap().unwrap().to_vec())
+            events.push(data.unwrap().unwrap().to_owned())
         }
 
-        println!("query successfull");
-        Ok(())
+        eventss.push(root_as_event(&events[0]).unwrap());
+        Ok(eventss)
     }
 
-    fn close(path: &str) {
-        let mut db_opts = Options::default();
-        db_opts.create_missing_column_families(true);
-        db_opts.create_if_missing(true);
+    // fn close(path: &str) {
+    //     let mut db_opts = Options::default();
+    //     db_opts.create_missing_column_families(true);
+    //     db_opts.create_if_missing(true);
 
-        DB::destroy(&db_opts, path).expect("failed to close");
-    }
+    //     DB::destroy(&db_opts, path).expect("failed to close");
+    // }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Deref;
+
     use super::*;
     use rstest::*;
 
@@ -155,7 +163,7 @@ mod tests {
 
     #[fixture]
     fn open_db(#[default("./src/db")] path: &str) -> RocksDBStore {
-        let db = RocksDBStore::open(path).unwrap();
+        let db = open(path).unwrap();
 
         db
     }
@@ -176,7 +184,7 @@ mod tests {
         #[with("./src/db1")] open_db: RocksDBStore,
         generate_fake_event_args: EventArgsType,
     ) {
-        let fb_event_data_bytes = event_to_fb(generate_fake_event_args);
+        let fb_event_data_bytes = event_args_to_fb(generate_fake_event_args);
 
         open_db
             .insert_event(&fb_to_event(&fb_event_data_bytes))
@@ -192,7 +200,7 @@ mod tests {
         #[with("./src/db2")] open_db: RocksDBStore,
         #[with(2000000)] generate_fake_event_args: EventArgsType,
     ) {
-        let fb_event_data_bytes = event_to_fb(generate_fake_event_args);
+        let fb_event_data_bytes = event_args_to_fb(generate_fake_event_args);
 
         open_db
             .insert_event(&fb_to_event(&fb_event_data_bytes))
@@ -214,7 +222,7 @@ mod tests {
                 ..generate_fake_event_args(i)
             };
 
-            let fb_event_data_bytes = event_to_fb(args);
+            let fb_event_data_bytes = event_args_to_fb(args);
 
             open_db
                 .insert_event(&fb_to_event(&fb_event_data_bytes))
@@ -227,9 +235,16 @@ mod tests {
             limit: 10,
         };
 
-        open_db
+        let event_data = open_db
             .list_aggregate_events(list_aggregate_events_params)
             .expect("failed to query");
+
+        // let events = event_data
+        //     .iter()
+        //     .map(|data| fb_to_event(data.deref()))
+        //     .collect::<Vec<Event>>();
+
+        assert_eq!(event_data.len(), 10);
 
         open_db.db.flush().expect("failed to flush");
     }
@@ -249,7 +264,7 @@ mod tests {
                 };
             }
 
-            let fb_event_data_bytes = event_to_fb(args);
+            let fb_event_data_bytes = event_args_to_fb(args);
 
             open_db
                 .insert_event(&fb_to_event(&fb_event_data_bytes))
@@ -262,9 +277,16 @@ mod tests {
             limit: 20,
         };
 
-        open_db
+        let event_data = open_db
             .list_aggregate_events(list_aggregate_events_params)
             .expect("failed to query");
+
+        // let events = event_data
+        //     .iter()
+        //     .map(|data| fb_to_event(data.deref()))
+        //     .collect::<Vec<Event>>();
+
+        assert_eq!(event_data.len(), 10);
 
         open_db.db.flush().expect("failed to flush");
     }
@@ -276,10 +298,12 @@ mod tests {
     //     let path2 = "./src/db1";
     //     let path3 = "./src/db2";
     //     let path4 = "./src/db3";
+    //     let path5 = "./src/db4";
 
     //     RocksDBStore::close(path1);
     //     RocksDBStore::close(path2);
     //     RocksDBStore::close(path3);
     //     RocksDBStore::close(path4);
+    //     RocksDBStore::close(path5);
     // }
 }

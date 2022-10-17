@@ -1,4 +1,4 @@
-use event_generated::{finish_event_buffer, root_as_event, Event, EventArgs};
+use crate::event_generated::{finish_event_buffer, root_as_event, Event, EventArgs};
 use flatbuffers::FlatBufferBuilder;
 
 pub struct EventArgsType {
@@ -12,7 +12,7 @@ pub struct EventArgsType {
     pub version: u8,
 }
 
-pub fn event_to_fb(event_args: EventArgsType) -> Vec<u8> {
+pub fn event_args_to_fb(event_args: EventArgsType) -> Vec<u8> {
     let mut bldr = FlatBufferBuilder::new();
 
     bldr.reset();
