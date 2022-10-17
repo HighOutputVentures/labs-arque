@@ -30,6 +30,7 @@ impl Client {
     let (tx, rx) = oneshot::channel::<String>();
 
     requests.insert(id, tx);
+
     sender.send((id, msg));
 
     (id, rx)
@@ -62,9 +63,60 @@ impl Client {
 
   pub async fn send(&self, msg: String) {
     let (id, rx) = self.send_request(msg);
-
+    println!("here");
     rx.await.unwrap();
     // self.socket.send(msg, 0).expect("cannot set message");
     // let _ = self.socket.recv_string(0).expect("unable to receive the response");
   }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{thread, time::Duration};
+    use super::*;
+    use rstest::*;
+
+    #[rstest]
+    #[tokio::test]
+    async fn send_test() {
+      thread::spawn(|| {
+        let ctx = zmq::Context::new();
+    
+        let router = ctx.socket(zmq::ROUTER).unwrap();
+        let dealer = ctx.socket(zmq::DEALER).unwrap();
+    
+        router.bind("tcp://*:5555").expect("failed to bind router");
+        dealer
+            .bind("inproc://workers")
+            .expect("failed to bind dealer");
+    
+        for id in 0..3 {
+            thread::spawn(move || {
+              let ctx = zmq::Context::new();
+
+              let worker = ctx.socket(zmq::REP).unwrap();
+              worker
+                  .connect("inproc://workers")
+                  .expect("failed to connect worker");
+            
+              println!("worker started");
+            
+              loop {
+                  let msg = worker.recv_string(0).unwrap().unwrap();
+                  println!("worker {}: {}", id, msg);
+                  thread::sleep(Duration::from_millis(1000));
+                  worker.send("pong", 0).unwrap();
+              }
+            });
+        }
+
+        println!("proxy");
+        zmq::proxy(&router, &dealer).expect("failed proxying");
+      });
+
+      let client = Client::connect("tcp://localhost:5555").unwrap();
+
+      client.send(format!("message: 1")).await;
+      client.send(format!("message: 2")).await;
+    }
 }
