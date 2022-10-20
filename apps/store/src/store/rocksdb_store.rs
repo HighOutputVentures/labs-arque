@@ -300,3 +300,5 @@ mod tests {
     //     close(path5);
     // }
 }
+
+fn main() {}
