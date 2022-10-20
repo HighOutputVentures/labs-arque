@@ -16,7 +16,7 @@ use uuid::Uuid;
 use byteorder::{BigEndian, ByteOrder};
 
 use crate::store::Store;
-use crate::store::{InsertEventError, ListAggregateEventsParams};
+use crate::store::{InsertEventError, InsertEventParams, ListAggregateEventsParams};
 
 fn open(path: &str) -> Result<RocksDBStore, Error> {
     let mut db_opts = Options::default();
@@ -45,6 +45,43 @@ pub struct RocksDBStore {
 }
 
 impl Store for RocksDBStore {
+    fn insert_event_next(&self, params: InsertEventParams) -> Result<(), InsertEventError> {
+        let mut batch = WriteBatch::default();
+
+        let cf1 = self.db.cf_handle("events").unwrap();
+        let cf2 = self.db.cf_handle("aggregate_events").unwrap();
+        let cf3 = self.db.cf_handle("aggregate_version").unwrap();
+
+        match self.db.get_pinned_cf(cf3, params.aggregate_id) {
+            Ok(Some(aggregate_version)) => {
+                if params
+                    .aggregate_version
+                    .ne(&(BigEndian::read_u32(&aggregate_version) + 1))
+                {
+                    return Err(InsertEventError::InvalidAggregateVersion);
+                }
+            }
+            Ok(None) => println!("value not found"),
+            Err(e) => panic!("failed to query: {}", e),
+        }
+
+        batch.put_cf(cf1, params.id, params.payload);
+        batch.put_cf(
+            cf2,
+            [params.aggregate_id, &params.aggregate_version.to_be_bytes()].concat(),
+            params.id,
+        );
+        batch.put_cf(
+            cf3,
+            params.aggregate_id,
+            params.aggregate_version.to_be_bytes(),
+        );
+
+        self.db.write(batch).expect("failed to write");
+
+        Ok(())
+    }
+
     fn insert_event(&self, event: &Event) -> Result<(), InsertEventError> {
         let mut batch = WriteBatch::default();
 
@@ -206,6 +243,64 @@ mod tests {
 
     #[rstest]
     #[tokio::test]
+    async fn insert_event_next_test(
+        #[with("./src/db5")] open_db: RocksDBStore,
+        generate_fake_event_args: EventArgsType,
+    ) {
+        let fb_event_data_bytes = event_args_to_fb(generate_fake_event_args);
+        let aggregate_id = Uuid::new_v4();
+        let id = Uuid::new_v4();
+
+        let params = InsertEventParams {
+            aggregate_id: aggregate_id.as_bytes(),
+            id: id.as_bytes(),
+            payload: fb_event_data_bytes.as_ref(),
+            aggregate_version: 1,
+        };
+
+        open_db
+            .insert_event_next(params)
+            .expect("failed to save event");
+
+        open_db.db.flush().expect("failed to flush");
+    }
+
+    #[rstest]
+    #[tokio::test]
+    #[should_panic(expected = "failed to save event: InvalidAggregateVersion")]
+    async fn insert_event_next_error_test(
+        #[with("./src/db6")] open_db: RocksDBStore,
+        generate_fake_event_args: EventArgsType,
+    ) {
+        let fb_event_data_bytes = event_args_to_fb(generate_fake_event_args);
+        let aggregate_id = Uuid::new_v4();
+        let id = Uuid::new_v4();
+
+        let params1 = InsertEventParams {
+            aggregate_id: aggregate_id.as_bytes(),
+            id: id.as_bytes(),
+            payload: fb_event_data_bytes.as_ref(),
+            aggregate_version: 1,
+        };
+
+        let params2 = InsertEventParams {
+            aggregate_id: aggregate_id.as_bytes(),
+            id: id.as_bytes(),
+            payload: fb_event_data_bytes.as_ref(),
+            aggregate_version: 1,
+        };
+
+        open_db
+            .insert_event_next(params1)
+            .expect("failed to save event");
+
+        open_db
+            .insert_event_next(params2)
+            .expect("failed to save event");
+    }
+
+    #[rstest]
+    #[tokio::test]
     async fn list_aggregate_events_test_1(#[with("./src/db3")] open_db: RocksDBStore) {
         let aggregate_id = Uuid::new_v4();
 
@@ -292,12 +387,16 @@ mod tests {
     //     let path3 = "./src/db2";
     //     let path4 = "./src/db3";
     //     let path5 = "./src/db4";
+    //     let path6 = "./src/db5";
+    //     let path7 = "./src/db6";
 
     //     close(path1);
     //     close(path2);
     //     close(path3);
     //     close(path4);
     //     close(path5);
+    //     close(path6);
+    //     close(path7);
     // }
 }
 
