@@ -13,14 +13,14 @@ pub struct ListAggregateEventsParams<'a> {
 }
 
 pub struct InsertEventParams<'a> {
-    pub id: &'a [u8]
+    pub id: &'a [u8],
     pub aggregate_id: &'a [u8],
     pub aggregate_version: u32,
-    pub payload: &'a Vec<u8>,
+    pub payload: &'a [u8],
 }
 
 pub trait Store {
-    // fn insert_event_next(&self, params: ) -> Result<(), InsertEventError>;
+    fn insert_event_next(&self, params: InsertEventParams) -> Result<(), InsertEventError>;
     fn insert_event(&self, event: &Event) -> Result<(), InsertEventError>;
     fn list_aggregate_events(
         &self,
