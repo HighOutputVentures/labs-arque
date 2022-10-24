@@ -19,7 +19,6 @@ fn producer(broker: &str) -> FutureProducer {
 
 pub struct KafkaStream {
     broker: String,
-    key: String,
 }
 
 #[async_trait]
@@ -28,9 +27,7 @@ impl Stream for KafkaStream {
         let producer = producer(self.broker.as_str());
 
         let status = producer.send(
-            FutureRecord::<str, Vec<u8>>::to(id.as_str())
-                .key(self.key.as_str())
-                .payload(data.as_ref()),
+            FutureRecord::<str, Vec<u8>>::to(id.as_str()).payload(data.as_ref()),
             None,
         );
 
@@ -44,8 +41,10 @@ impl Stream for KafkaStream {
 async fn main() {
     let stream = KafkaStream {
         broker: "localhost:9092".to_string(),
-        key: "test".to_string(),
     };
 
-    stream.send("demo".to_string(), vec![0,1,2]).await.unwrap();
+    stream
+        .send("demo".to_string(), vec![0, 1, 2])
+        .await
+        .unwrap();
 }

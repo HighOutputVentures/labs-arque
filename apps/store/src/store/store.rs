@@ -1,4 +1,3 @@
-use arque_common::event_generated::Event;
 use custom_error::custom_error;
 use rocksdb::Error;
 
@@ -16,12 +15,11 @@ pub struct InsertEventParams<'a> {
     pub id: &'a [u8],
     pub aggregate_id: &'a [u8],
     pub aggregate_version: u32,
-    pub payload: &'a [u8],
+    pub payload: &'a Vec<u8>,
 }
 
 pub trait Store {
-    fn insert_event_next(&self, params: InsertEventParams) -> Result<(), InsertEventError>;
-    fn insert_event(&self, event: &Event) -> Result<(), InsertEventError>;
+    fn insert_event(&self, params: InsertEventParams) -> Result<(), InsertEventError>;
     fn list_aggregate_events(
         &self,
         params: ListAggregateEventsParams,
