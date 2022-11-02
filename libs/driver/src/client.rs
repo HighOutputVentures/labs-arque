@@ -1,72 +1,83 @@
-use std::{collections::HashMap, sync::Mutex};
-use rand::{rngs::ThreadRng, Rng};
-use std::sync::mpsc::Sender;
+use std::{sync::{mpsc::Sender, Arc, Mutex}, collections::HashMap};
 
 pub struct Client {
-  requests: Mutex<HashMap<u16, oneshot::Sender<String>>>,
-  rng: Mutex<ThreadRng>,
-  sender: Sender<(u16, String)>,
+  sender: Sender<(u32, String, oneshot::Sender<String>)>,
 }
 
 impl Client {
-  fn send_request(&self, msg: String) -> (u16, oneshot::Receiver<String>) {
-    let mut rng = self.rng.lock().unwrap();
-    let mut requests = self.requests.lock().unwrap();
+  fn send_request(&self, msg: String) -> Result<oneshot::Receiver<String>, Box<dyn std::error::Error>> {
+    let id = fastrand::u32(..);
+
     let sender = self.sender.clone();
     
-    let id = {
-      let mut id: u16;
-      loop {
-        id = rng.gen();
-  
-        if !requests.contains_key(&id) {
-          break;
-        }
-      }
-
-      id
-    };
-
     let (tx, rx) = oneshot::channel::<String>();
 
-    requests.insert(id, tx);
+    sender.send((id, msg, tx))?;
 
-    sender.send((id, msg));
-
-    (id, rx)
+    Ok(rx)
   }
 
-  pub fn connect(endpoint: &str) -> Result<Client, Box<dyn std::error::Error>> {
+  pub async fn connect(endpoint: String) -> Result<Client, Box<dyn std::error::Error>> {
     let ctx = zmq::Context::new();
-    let socket = ctx.socket(zmq::REQ).unwrap();
 
-    socket
-      .connect(endpoint).unwrap();
+    let socket = ctx.socket(zmq::DEALER).unwrap();
 
-    let (tx, rx) = std::sync::mpsc::channel::<(u16, String)>();
+    let (tx, rx) = std::sync::mpsc::channel::<(u32, String, oneshot::Sender<String>)>();
 
+    let requests_: Arc<Mutex<HashMap<u32, oneshot::Sender<String>>>> = Arc::new(Mutex::new(HashMap::new()));
+
+    let (conn_tx, conn_rx) = oneshot::channel::<()>();
+    let requests = requests_.clone();
     std::thread::spawn(move || {
-      loop {
-        let (id, msg) = rx.recv().unwrap();
-        socket.send(&msg, 0);
+      // prepare connection
+      socket.connect(endpoint.as_str()).unwrap();
 
-        println!("id: {}", id);
+      conn_tx.send(()).unwrap();
+
+      loop {
+        let (id, msg, tx) = rx.recv().unwrap();
+
+        let mut requests = requests.lock().unwrap();
+
+        requests.insert(id, tx);
+
+        drop(requests);
+
+        println!("id: {}, message: \"{}\"", id, msg);
       }
     });
 
+    let requests = requests_.clone();
+    std::thread::spawn(move || {
+      loop {
+        let mut requests = requests.lock().unwrap();
+
+        let keys: Vec<u32> = requests.keys().map(|v| *v).collect();
+
+        for id in keys {
+          let tx = requests.remove(&id).unwrap();
+
+          tx.send(format!("response: {}", id)).unwrap();
+        }
+
+        drop(requests);
+      }
+    });
+
+    conn_rx.await?;
+
     Ok(Client {
-      requests: Mutex::new(HashMap::new()),
-      rng: Mutex::new(rand::thread_rng()),
       sender: tx,
     })
   }
 
-  pub async fn send(&self, msg: String) {
-    let (id, rx) = self.send_request(msg);
-    println!("here");
-    rx.await.unwrap();
-    // self.socket.send(msg, 0).expect("cannot set message");
-    // let _ = self.socket.recv_string(0).expect("unable to receive the response");
+  pub async fn send(&self, msg: String) -> Result<String, Box<dyn std::error::Error>> {
+    let rx = self.send_request(msg).unwrap();
+    let response = rx.await.unwrap();
+
+    println!("response: \"{}\"", response);
+
+    Ok(response)
   }
 }
 
@@ -74,6 +85,7 @@ impl Client {
 mod tests {
     use std::{thread, time::Duration};
     use super::*;
+    use futures::future::join_all;
     use rstest::*;
 
     #[rstest]
@@ -110,13 +122,14 @@ mod tests {
             });
         }
 
-        println!("proxy");
         zmq::proxy(&router, &dealer).expect("failed proxying");
       });
 
-      let client = Client::connect("tcp://localhost:5555").unwrap();
+      let client = Client::connect("tcp://localhost:5555".to_string()).await.unwrap();
 
-      client.send(format!("message: 1")).await;
-      client.send(format!("message: 2")).await;
+      join_all([
+        client.send(format!("message 1")),
+        client.send(format!("message 2")),
+      ]).await;
     }
 }

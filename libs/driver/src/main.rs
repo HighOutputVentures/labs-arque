@@ -43,7 +43,7 @@ fn main() {
     .build()
     .unwrap()
     .block_on(async {
-      let client = Client::connect("tcp://localhost:5555").unwrap();
+      let client = Client::connect("tcp://localhost:5555".to_string()).await.unwrap();
 
       let mut handles = vec![];
 
