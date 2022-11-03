@@ -53,3 +53,5 @@ pub fn fb_to_event(buf: &[u8]) -> Event {
 }
 
 pub mod event_generated;
+pub mod request_generated;
+pub mod response_generated;

@@ -1,5 +1,6 @@
 mod store;
 mod client;
+mod controller;
 
 use std::thread;
 use std::time::Duration;
