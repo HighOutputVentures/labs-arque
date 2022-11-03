@@ -13,15 +13,15 @@ impl Controller {
     Ok(vec![])
   }
 
-  fn insert_event(body: &Event) -> Result<Response, Box<dyn std::error::Error>> {
+  fn insert_event(body: &Event) -> Result<(), Box<dyn std::error::Error>> {
     /**
      * - call Store#insert_event
      * - forward events to Kafka
     */
-    Ok(vec![])
+    Ok(())
   }
 
-  fn list_aggregate_events(body: &ListAggregateEventsRequestBody) -> Result<Response, Box<dyn std::error::Error>> {
-    Ok(vec![])
+  fn list_aggregate_events(body: &ListAggregateEventsRequestBody) -> Result<(), Box<dyn std::error::Error>> {
+    Ok(())
   }
 }
