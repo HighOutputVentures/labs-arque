@@ -1,6 +1,7 @@
 use arque_common::request_generated::{Event,ListAggregateEventsRequestBody};
 use arque_common::response_generated::{Response};
 
+use crate::store::Store;
 pub struct Controller {}
 
 impl Controller {

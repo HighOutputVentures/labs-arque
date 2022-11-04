@@ -1,18 +1,12 @@
-mod store;
-
 use arque_common::event_args_to_fb;
 use arque_common::event_generated::Event;
 use arque_common::event_to_event_args;
 use arque_common::fb_to_event;
 use arque_common::EventArgsType;
-
 use rocksdb::Options;
 use rocksdb::{Error, WriteBatch, DB};
-
 use chrono::Local;
-
 use uuid::Uuid;
-
 use byteorder::{BigEndian, ByteOrder};
 
 use crate::store::Store;
@@ -338,5 +332,3 @@ mod tests {
     //     close(path5);
     // }
 }
-
-fn main() {}
