@@ -8,34 +8,27 @@ use rocksdb::{Error, WriteBatch, DB};
 use chrono::Local;
 use uuid::Uuid;
 use byteorder::{BigEndian, ByteOrder};
-
-use crate::store::Store;
-use crate::store::{InsertEventError, InsertEventParams, ListAggregateEventsParams};
-
-fn open(path: &str) -> Result<RocksDBStore, Error> {
-    let mut db_opts = Options::default();
-    db_opts.create_missing_column_families(true);
-    db_opts.create_if_missing(true);
-
-    let db = DB::open_cf(
-        &db_opts,
-        path,
-        vec!["events", "aggregate_events", "aggregate_version"],
-    )?;
-
-    Ok(RocksDBStore { db })
-}
-
-// fn close(path: &str) {
-//     let mut db_opts = Options::default();
-//     db_opts.create_missing_column_families(true);
-//     db_opts.create_if_missing(true);
-
-//     DB::destroy(&db_opts, path).expect("failed to close");
-// }
+use super::Store;
+use super::{InsertEventError, InsertEventParams, ListAggregateEventsParams};
 
 pub struct RocksDBStore {
     db: DB,
+}
+
+impl RocksDBStore {
+    pub fn open(path: &str) -> Result<RocksDBStore, Error> {
+        let mut db_opts = Options::default();
+        db_opts.create_missing_column_families(true);
+        db_opts.create_if_missing(true);
+    
+        let db = DB::open_cf(
+            &db_opts,
+            path,
+            vec!["events", "aggregate_events", "aggregate_version"],
+        )?;
+    
+        Ok(RocksDBStore { db })
+    }
 }
 
 impl Store for RocksDBStore {
