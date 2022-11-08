@@ -1,5 +1,5 @@
-mod store;
 mod rocksdb_store;
+mod store;
 
-pub use store::{Store, InsertEventError, InsertEventParams, ListAggregateEventsParams};
-pub use rocksdb_store::{RocksDBStore};
+pub use rocksdb_store::RocksDBStore;
+pub use store::{InsertEventError, InsertEventParams, ListAggregateEventsParams, Store};
