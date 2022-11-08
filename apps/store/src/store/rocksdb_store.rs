@@ -1,15 +1,16 @@
+#[path = "./store.rs"] mod store;
+use crate::store::{InsertEventError, InsertEventParams, ListAggregateEventsParams, Store};
+
 use arque_common::event_args_to_fb;
 use arque_common::event_generated::Event;
 use arque_common::event_to_event_args;
 use arque_common::fb_to_event;
 use arque_common::EventArgsType;
+use byteorder::{BigEndian, ByteOrder};
+use chrono::Local;
 use rocksdb::Options;
 use rocksdb::{Error, WriteBatch, DB};
-use chrono::Local;
 use uuid::Uuid;
-use byteorder::{BigEndian, ByteOrder};
-use super::Store;
-use super::{InsertEventError, InsertEventParams, ListAggregateEventsParams};
 
 pub struct RocksDBStore {
     db: DB,
@@ -20,13 +21,13 @@ impl RocksDBStore {
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
         db_opts.create_if_missing(true);
-    
+
         let db = DB::open_cf(
             &db_opts,
             path,
             vec!["events", "aggregate_events", "aggregate_version"],
         )?;
-    
+
         Ok(RocksDBStore { db })
     }
 }
@@ -137,7 +138,7 @@ mod tests {
 
     #[fixture]
     fn open_db(#[default("./src/db")] path: &str) -> RocksDBStore {
-        let db = open(path).unwrap();
+        let db = RocksDBStore::open(path).unwrap();
 
         db
     }
