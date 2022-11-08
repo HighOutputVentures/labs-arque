@@ -19,7 +19,7 @@ pub fn list_aggregate_events(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arque_common::request_generated::EventArgs;
+    use arque_common::request_generated::ListAggregateEventsRequestBodyArgs;
     use chrono::Local;
     use flatbuffers::FlatBufferBuilder;
     use rstest::*;
