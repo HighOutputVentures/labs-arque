@@ -14,8 +14,12 @@ table ListAggregateEventsRequestBody {
   limit:uint32;
 }
 
+table InsertEventRequestBody {
+  event:Event;
+}
+
 union RequestBody {
-  InsertEvent:Event,
+  InsertEvent:InsertEventRequestBody,
   ListAggregateEvents:ListAggregateEventsRequestBody
 }
 

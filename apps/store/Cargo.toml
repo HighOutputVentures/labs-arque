@@ -27,15 +27,3 @@ features = [
 
 [dev-dependencies]
 rstest = "0.15.0"
-
-[[bin]]
-name = "rocksdb"
-path = "./src/store/rocksdb_store.rs"
-
-[[bin]]
-name = "kafkastream"
-path = "./src/stream/kafka_stream.rs"
-
-[[bin]]
-name = "consumer"
-path = "./src/stream/consumer.rs"

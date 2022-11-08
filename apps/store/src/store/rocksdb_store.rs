@@ -1,6 +1,4 @@
-#[path = "./store.rs"] mod store;
-use crate::store::{InsertEventError, InsertEventParams, ListAggregateEventsParams, Store};
-
+use super::{InsertEventError, InsertEventParams, ListAggregateEventsParams, Store};
 use arque_common::event_args_to_fb;
 use arque_common::event_generated::Event;
 use arque_common::event_to_event_args;

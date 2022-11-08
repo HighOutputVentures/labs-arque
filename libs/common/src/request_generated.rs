@@ -402,6 +402,100 @@ impl core::fmt::Debug for ListAggregateEventsRequestBody<'_> {
       ds.finish()
   }
 }
+pub enum InsertEventRequestBodyOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct InsertEventRequestBody<'a> {
+  pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for InsertEventRequestBody<'a> {
+  type Inner = InsertEventRequestBody<'a>;
+  #[inline]
+  fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    Self { _tab: flatbuffers::Table { buf, loc } }
+  }
+}
+
+impl<'a> InsertEventRequestBody<'a> {
+  pub const VT_EVENT: flatbuffers::VOffsetT = 4;
+
+  #[inline]
+  pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+    InsertEventRequestBody { _tab: table }
+  }
+  #[allow(unused_mut)]
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+    args: &'args InsertEventRequestBodyArgs<'args>
+  ) -> flatbuffers::WIPOffset<InsertEventRequestBody<'bldr>> {
+    let mut builder = InsertEventRequestBodyBuilder::new(_fbb);
+    if let Some(x) = args.event { builder.add_event(x); }
+    builder.finish()
+  }
+
+
+  #[inline]
+  pub fn event(&self) -> Option<Event<'a>> {
+    self._tab.get::<flatbuffers::ForwardsUOffset<Event>>(InsertEventRequestBody::VT_EVENT, None)
+  }
+}
+
+impl flatbuffers::Verifiable for InsertEventRequestBody<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut flatbuffers::Verifier, pos: usize
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    use self::flatbuffers::Verifiable;
+    v.visit_table(pos)?
+     .visit_field::<flatbuffers::ForwardsUOffset<Event>>("event", Self::VT_EVENT, false)?
+     .finish();
+    Ok(())
+  }
+}
+pub struct InsertEventRequestBodyArgs<'a> {
+    pub event: Option<flatbuffers::WIPOffset<Event<'a>>>,
+}
+impl<'a> Default for InsertEventRequestBodyArgs<'a> {
+  #[inline]
+  fn default() -> Self {
+    InsertEventRequestBodyArgs {
+      event: None,
+    }
+  }
+}
+
+pub struct InsertEventRequestBodyBuilder<'a: 'b, 'b> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+  start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> InsertEventRequestBodyBuilder<'a, 'b> {
+  #[inline]
+  pub fn add_event(&mut self, event: flatbuffers::WIPOffset<Event<'b >>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<Event>>(InsertEventRequestBody::VT_EVENT, event);
+  }
+  #[inline]
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> InsertEventRequestBodyBuilder<'a, 'b> {
+    let start = _fbb.start_table();
+    InsertEventRequestBodyBuilder {
+      fbb_: _fbb,
+      start_: start,
+    }
+  }
+  #[inline]
+  pub fn finish(self) -> flatbuffers::WIPOffset<InsertEventRequestBody<'a>> {
+    let o = self.fbb_.end_table(self.start_);
+    flatbuffers::WIPOffset::new(o.value())
+  }
+}
+
+impl core::fmt::Debug for InsertEventRequestBody<'_> {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    let mut ds = f.debug_struct("InsertEventRequestBody");
+      ds.field("event", &self.event());
+      ds.finish()
+  }
+}
 pub enum RequestOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -447,9 +541,9 @@ impl<'a> Request<'a> {
   }
   #[inline]
   #[allow(non_snake_case)]
-  pub fn body_as_insert_event(&self) -> Option<Event<'a>> {
+  pub fn body_as_insert_event(&self) -> Option<InsertEventRequestBody<'a>> {
     if self.body_type() == RequestBody::InsertEvent {
-      self.body().map(Event::init_from_table)
+      self.body().map(InsertEventRequestBody::init_from_table)
     } else {
       None
     }
@@ -476,7 +570,7 @@ impl flatbuffers::Verifiable for Request<'_> {
     v.visit_table(pos)?
      .visit_union::<RequestBody, _>("body_type", Self::VT_BODY_TYPE, "body", Self::VT_BODY, false, |key, v, pos| {
         match key {
-          RequestBody::InsertEvent => v.verify_union_variant::<flatbuffers::ForwardsUOffset<Event>>("RequestBody::InsertEvent", pos),
+          RequestBody::InsertEvent => v.verify_union_variant::<flatbuffers::ForwardsUOffset<InsertEventRequestBody>>("RequestBody::InsertEvent", pos),
           RequestBody::ListAggregateEvents => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ListAggregateEventsRequestBody>>("RequestBody::ListAggregateEvents", pos),
           _ => Ok(()),
         }

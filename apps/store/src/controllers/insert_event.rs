@@ -1,22 +1,25 @@
 use crate::store::InsertEventParams;
-use arque_common::request_generated::Event;
+use arque_common::request_generated::{InsertEventRequestBody};
 
 use super::ControllerContext;
 
 pub fn insert_event(
     ctx: &ControllerContext,
-    body: &Event,
+    body: &InsertEventRequestBody,
 ) -> Result<(), Box<dyn std::error::Error>> {
     /**
      * - call Store#insert_event
      * - forward events to Kafka
      */
+
+    let event = body.event().unwrap();
+
     ctx.store
         .insert_event(InsertEventParams {
-            id: body.id().unwrap(),
-            aggregate_id: body.aggregate_id().unwrap(),
-            aggregate_version: body.aggregate_version(),
-            payload: &body.body().unwrap().to_vec(),
+            id: event.id().unwrap(),
+            aggregate_id: event.aggregate_id().unwrap(),
+            aggregate_version: event.aggregate_version(),
+            payload: &event.body().unwrap().to_vec(), // this should be the entire event object
         })
         .unwrap();
     Ok(())
@@ -25,7 +28,7 @@ pub fn insert_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arque_common::request_generated::EventArgs;
+    use arque_common::request_generated::{Event,EventArgs};
     use chrono::Local;
     use flatbuffers::FlatBufferBuilder;
     use rstest::*;
