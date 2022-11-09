@@ -1,14 +1,7 @@
 use super::{InsertEventError, InsertEventParams, ListAggregateEventsParams, Store};
-use arque_common::event_args_to_fb;
-use arque_common::event_generated::Event;
-use arque_common::event_to_event_args;
-use arque_common::fb_to_event;
-use arque_common::EventArgsType;
 use byteorder::{BigEndian, ByteOrder};
-use chrono::Local;
 use rocksdb::Options;
 use rocksdb::{Error, WriteBatch, DB};
-use uuid::Uuid;
 
 pub struct RocksDBStore {
     db: DB,
@@ -37,7 +30,7 @@ impl Store for RocksDBStore {
         let cf1 = self.db.cf_handle("events").unwrap();
         let cf2 = self.db.cf_handle("aggregate_events").unwrap();
         let cf3 = self.db.cf_handle("aggregate_version").unwrap();
-
+        println!("params: {:?}", params.aggregate_id);
         match self.db.get_pinned_cf(cf3, params.aggregate_id) {
             Ok(Some(aggregate_version)) => {
                 if params
@@ -116,7 +109,13 @@ impl Store for RocksDBStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arque_common::event_args_to_fb;
+    use arque_common::event_generated::Event;
+    use arque_common::fb_to_event;
+    use arque_common::EventArgsType;
+    use chrono::Local;
     use rstest::*;
+    use uuid::Uuid;
 
     #[fixture]
     fn generate_fake_event_args(#[default(1)] aggregate_version: u32) -> EventArgsType {

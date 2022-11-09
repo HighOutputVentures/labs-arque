@@ -18,31 +18,55 @@ pub fn list_aggregate_events(
 
 #[cfg(test)]
 mod tests {
+    use crate::store::RocksDBStore;
     use super::*;
     use arque_common::request_generated::ListAggregateEventsRequestBodyArgs;
-    use chrono::Local;
     use flatbuffers::FlatBufferBuilder;
     use rstest::*;
     use uuid::Uuid;
 
+    #[fixture]
+    fn open_db(#[default("./src/db")] path: &str) -> RocksDBStore {
+        let db = RocksDBStore::open(path).unwrap();
+
+        db
+    }
+
     #[rstest]
     #[tokio::test]
-    async fn handle_list_aggregate_events_request_test() {
+    async fn list_aggregate_events_request_test(#[with("./src/db1")] open_db: RocksDBStore) {
         let mut bldr = FlatBufferBuilder::new();
 
         bldr.reset();
 
         let aggregate_id = Uuid::new_v4();
 
-        let list_aggregate_events_args = ListAggregateEventsRequestBodyArgs {
+        let list_aggregate_events_request_body_args = ListAggregateEventsRequestBodyArgs {
             aggregate_id: Some(bldr.create_vector(&aggregate_id.as_bytes().as_slice())),
             aggregate_version: 1u32,
             limit: 1u32,
         };
 
-        let list_aggregate_events_data =
-            ListAggregateEventsRequestBody::create(&mut bldr, &list_aggregate_events_args);
+        let list_aggregate_events_request_body_data = ListAggregateEventsRequestBody::create(
+            &mut bldr,
+            &list_aggregate_events_request_body_args,
+        );
 
-        bldr.finish(list_aggregate_events_data, None);
+        bldr.finish(list_aggregate_events_request_body_data, None);
+
+        let data = bldr.finished_data();
+
+        let list_aggregate_events_request_body =
+            flatbuffers::root::<ListAggregateEventsRequestBody>(data);
+
+        let controller_context = ControllerContext {
+            store: Box::new(open_db),
+        };
+
+        list_aggregate_events(
+            &controller_context,
+            &list_aggregate_events_request_body.unwrap(),
+        )
+        .unwrap();
     }
 }

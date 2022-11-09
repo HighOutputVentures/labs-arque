@@ -7,18 +7,13 @@ use crate::store::Store;
 use arque_common::request_generated::{root_as_request, RequestBody};
 
 pub struct ControllerContext {
-    pub store: dyn Store,
+    pub store: Box<dyn Store>,
 }
 
 pub fn handle_request(
     ctx: &ControllerContext,
     data: &Vec<u8>,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    /**
-     * - deserialize data
-     * - determine the request type
-     * - call the corresponding controller
-     */
     let request = root_as_request(data).unwrap();
 
     if request.body_type() == RequestBody::InsertEvent {
@@ -29,4 +24,3 @@ pub fn handle_request(
 
     Ok(vec![])
 }
-

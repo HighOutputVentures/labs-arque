@@ -1,25 +1,40 @@
-use crate::store::InsertEventParams;
-use arque_common::request_generated::{InsertEventRequestBody};
-
 use super::ControllerContext;
+use crate::store::InsertEventParams;
+use arque_common::request_generated::{Event, EventArgs, InsertEventRequestBody};
+use flatbuffers::FlatBufferBuilder;
 
 pub fn insert_event(
     ctx: &ControllerContext,
     body: &InsertEventRequestBody,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    /**
-     * - call Store#insert_event
-     * - forward events to Kafka
-     */
-
     let event = body.event().unwrap();
+
+    let mut bldr = FlatBufferBuilder::new();
+
+    bldr.reset();
+
+    let event_args = EventArgs {
+        id: Some(bldr.create_vector(&event.id().unwrap())),
+        type_: 1u16,
+        aggregate_id: Some(bldr.create_vector(&event.aggregate_id().unwrap())),
+        aggregate_version: 1u32,
+        body: Some(bldr.create_vector(&event.body().unwrap())),
+        metadata: Some(bldr.create_vector(&event.metadata().unwrap())),
+        timestamp: event.timestamp(),
+    };
+
+    let event_data = Event::create(&mut bldr, &event_args);
+
+    bldr.finish(event_data, None);
+
+    let event_vec = bldr.finished_data().to_vec();
 
     ctx.store
         .insert_event(InsertEventParams {
             id: event.id().unwrap(),
             aggregate_id: event.aggregate_id().unwrap(),
             aggregate_version: event.aggregate_version(),
-            payload: &event.body().unwrap().to_vec(), // this should be the entire event object
+            payload: &event_vec, // this should be the entire event object
         })
         .unwrap();
     Ok(())
@@ -27,16 +42,26 @@ pub fn insert_event(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use arque_common::request_generated::{Event,EventArgs};
+    use arque_common::request_generated::{
+        Event, EventArgs, InsertEventRequestBody, InsertEventRequestBodyArgs,
+    };
     use chrono::Local;
     use flatbuffers::FlatBufferBuilder;
     use rstest::*;
     use uuid::Uuid;
+    use crate::store::RocksDBStore;
+    use super::*;
+
+    #[fixture]
+    fn open_db(#[default("./src/db")] path: &str) -> RocksDBStore {
+        let db = RocksDBStore::open(path).unwrap();
+
+        db
+    }
 
     #[rstest]
     #[tokio::test]
-    async fn insert_event_request_test() {
+    async fn insert_event_request_test(#[with("./src/db1")] open_db: RocksDBStore) {
         let mut bldr = FlatBufferBuilder::new();
 
         bldr.reset();
@@ -44,7 +69,7 @@ mod tests {
         let id = Uuid::new_v4();
         let aggregate_id = Uuid::new_v4();
 
-        let insert_event_args = EventArgs {
+        let event_args = EventArgs {
             id: Some(bldr.create_vector(&id.as_bytes().as_slice())),
             type_: 1u16,
             aggregate_id: Some(bldr.create_vector(&aggregate_id.as_bytes().as_slice())),
@@ -54,8 +79,25 @@ mod tests {
             timestamp: Local::now().timestamp() as u32,
         };
 
-        let insert_event_data = Event::create(&mut bldr, &insert_event_args);
+        let event_data = Event::create(&mut bldr, &event_args);
 
-        bldr.finish(insert_event_data, None);
+        let insert_event_request_body_args = InsertEventRequestBodyArgs {
+            event: Some(event_data),
+        };
+
+        let insert_event_request_body_data =
+            InsertEventRequestBody::create(&mut bldr, &insert_event_request_body_args);
+
+        bldr.finish(insert_event_request_body_data, None);
+
+        let data = bldr.finished_data();
+
+        let insert_event_request_body = flatbuffers::root::<InsertEventRequestBody>(data);
+
+        let controller_context = ControllerContext {
+            store: Box::new(open_db),
+        };
+
+        insert_event(&controller_context, &insert_event_request_body.unwrap()).unwrap();
     }
 }
