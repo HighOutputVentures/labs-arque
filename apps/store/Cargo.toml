@@ -9,6 +9,7 @@ tokio = { version = "1.0", features = ["full"] }
 custom_error = "1.9"
 rocksdb = "0.19"
 arque_common = { path = "../../libs/common" }
+arque_driver = { path = "../../libs/driver" }
 chrono = "0.4"
 byteorder = "1.4.3"
 rdkafka = { version = "0.28.0", features = ["cmake-build"] }
