@@ -3,6 +3,7 @@ use crate::store::InsertEventParams;
 use arque_common::request_generated::{Event, EventArgs, InsertEventRequestBody};
 use flatbuffers::FlatBufferBuilder;
 
+
 pub fn insert_event(
     ctx: &ControllerContext,
     body: &InsertEventRequestBody,
@@ -51,10 +52,11 @@ mod tests {
     use uuid::Uuid;
     use crate::store::RocksDBStore;
     use super::*;
+    use std::path::Path;
 
     #[fixture]
     fn open_db(#[default("./src/db")] path: &str) -> RocksDBStore {
-        let db = RocksDBStore::open(path).unwrap();
+        let db = RocksDBStore::open(Path::new(path)).unwrap();
 
         db
     }
