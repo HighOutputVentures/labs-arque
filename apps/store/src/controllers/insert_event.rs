@@ -47,28 +47,49 @@ pub fn insert_event(
 mod tests {
     use super::*;
     use crate::{
-        store::{RocksDBStore, Store},
-        stream::KafkaStream,
+        store::{InsertEventError, ListAggregateEventsParams, Store},
+        stream::Stream,
     };
     use arque_common::request_generated::{
         Event, EventArgs, InsertEventRequestBody, InsertEventRequestBodyArgs,
     };
+    use async_trait::async_trait;
     use chrono::Local;
     use flatbuffers::FlatBufferBuilder;
+    use rdkafka::error::KafkaError;
+    use rocksdb::Error;
     use rstest::*;
-    use std::path::Path;
     use uuid::Uuid;
+    pub struct MockRocksDBStore;
 
-    #[fixture]
-    fn open_db(#[default("./src/db")] path: &str) -> RocksDBStore {
-        let db = RocksDBStore::open(Path::new(path)).unwrap();
+    impl Store for MockRocksDBStore {
+        fn insert_event(&self, params: InsertEventParams) -> Result<(), InsertEventError> {
+            println!("insert_event");
+            Ok(())
+        }
 
-        db
+        fn list_aggregate_events(
+            &self,
+            params: ListAggregateEventsParams,
+        ) -> Result<Vec<Vec<u8>>, Error> {
+            println!("list_aggregate_events");
+            Ok(vec![])
+        }
+    }
+
+    pub struct MockKafkaStream;
+
+    #[async_trait]
+    impl Stream for MockKafkaStream {
+        async fn send(&self, id: String, data: Vec<u8>) -> Result<(), KafkaError> {
+            println!("send");
+            Ok(())
+        }
     }
 
     #[rstest]
     #[tokio::test]
-    async fn insert_event_request_test(#[with("./src/db1")] open_db: RocksDBStore) {
+    async fn insert_event_request_test() {
         let mut bldr = FlatBufferBuilder::new();
 
         bldr.reset();
@@ -101,13 +122,9 @@ mod tests {
 
         let insert_event_request_body = flatbuffers::root::<InsertEventRequestBody>(data);
 
-        let stream = KafkaStream {
-            broker: "localhost:9092".to_string(),
-        };
-
         let controller_context = ControllerContext {
-            store: Box::new(open_db),
-            stream: Box::new(stream),
+            store: Box::new(MockRocksDBStore {}),
+            stream: Box::new(MockKafkaStream {}),
         };
 
         insert_event(&controller_context, &insert_event_request_body.unwrap()).unwrap();
