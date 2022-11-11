@@ -38,7 +38,8 @@ pub fn insert_event(
         })
         .unwrap();
 
-    ctx.stream.send(hex::encode(event.aggregate_id().unwrap()), event_vec);
+    ctx.stream
+        .send(hex::encode(event.aggregate_id().unwrap()), event_vec);
     Ok(())
 }
 
@@ -55,11 +56,12 @@ mod tests {
     use chrono::Local;
     use flatbuffers::FlatBufferBuilder;
     use rstest::*;
+    use std::path::Path;
     use uuid::Uuid;
 
     #[fixture]
     fn open_db(#[default("./src/db")] path: &str) -> RocksDBStore {
-        let db = RocksDBStore::open(path).unwrap();
+        let db = RocksDBStore::open(Path::new(path)).unwrap();
 
         db
     }

@@ -2,13 +2,14 @@ use super::{InsertEventError, InsertEventParams, ListAggregateEventsParams, Stor
 use byteorder::{BigEndian, ByteOrder};
 use rocksdb::Options;
 use rocksdb::{Error, WriteBatch, DB};
+use std::path::Path;
 
 pub struct RocksDBStore {
     db: DB,
 }
 
 impl RocksDBStore {
-    pub fn open(path: &str) -> Result<RocksDBStore, Error> {
+    pub fn open(path: &Path) -> Result<RocksDBStore, Error> {
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
         db_opts.create_if_missing(true);
@@ -135,7 +136,7 @@ mod tests {
 
     #[fixture]
     fn open_db(#[default("./src/db")] path: &str) -> RocksDBStore {
-        let db = RocksDBStore::open(path).unwrap();
+        let db = RocksDBStore::open(Path::new(path)).unwrap();
 
         db
     }

@@ -48,10 +48,11 @@ mod tests {
     use flatbuffers::FlatBufferBuilder;
     use rstest::*;
     use uuid::Uuid;
+    use std::path::Path;
 
     #[fixture]
     fn open_db(#[default("./src/db")] path: &str) -> RocksDBStore {
-        let db = RocksDBStore::open(path).unwrap();
+        let db = RocksDBStore::open(Path::new(path)).unwrap();
 
         db
     }
