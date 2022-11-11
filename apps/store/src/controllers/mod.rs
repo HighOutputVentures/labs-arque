@@ -1,13 +1,14 @@
 mod insert_event;
 mod list_aggregate_events;
 
-use crate::controllers::insert_event::insert_event;
+use crate::{controllers::insert_event::insert_event, stream::Stream};
 use crate::controllers::list_aggregate_events::list_aggregate_events;
 use crate::store::Store;
 use arque_common::request_generated::{root_as_request, RequestBody};
 
 pub struct ControllerContext {
     pub store: Box<dyn Store>,
+    pub stream: Box<dyn Stream>
 }
 
 pub fn handle_request(

@@ -1,6 +1,9 @@
 use super::ControllerContext;
 use crate::store::ListAggregateEventsParams;
-use arque_common::request_generated::ListAggregateEventsRequestBody;
+use arque_common::request_generated::{
+    ListAggregateEventsRequestBody, ListAggregateEventsRequestBodyArgs,
+};
+use flatbuffers::FlatBufferBuilder;
 
 pub fn list_aggregate_events(
     ctx: &ControllerContext,
@@ -13,13 +16,34 @@ pub fn list_aggregate_events(
             limit: body.limit() as usize,
         })
         .unwrap();
+
+    let mut bldr = FlatBufferBuilder::new();
+
+    bldr.reset();
+
+    let list_aggregate_events_request_body_args = ListAggregateEventsRequestBodyArgs {
+        aggregate_id: Some(bldr.create_vector(&body.aggregate_id().unwrap())),
+        aggregate_version: body.aggregate_version(),
+        limit: body.limit(),
+    };
+
+    let list_aggregate_events_request_body_data =
+        ListAggregateEventsRequestBody::create(&mut bldr, &list_aggregate_events_request_body_args);
+
+    bldr.finish(list_aggregate_events_request_body_data, None);
+
+    let data = bldr.finished_data().to_vec();
+
+    ctx.stream
+        .send(hex::encode(body.aggregate_id().unwrap()), data);
+
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::store::RocksDBStore;
     use super::*;
+    use crate::{store::RocksDBStore, stream::KafkaStream};
     use arque_common::request_generated::ListAggregateEventsRequestBodyArgs;
     use flatbuffers::FlatBufferBuilder;
     use rstest::*;
@@ -59,8 +83,13 @@ mod tests {
         let list_aggregate_events_request_body =
             flatbuffers::root::<ListAggregateEventsRequestBody>(data);
 
+        let stream = KafkaStream {
+            broker: "localhost:9092".to_string(),
+        };
+
         let controller_context = ControllerContext {
             store: Box::new(open_db),
+            stream: Box::new(stream),
         };
 
         list_aggregate_events(

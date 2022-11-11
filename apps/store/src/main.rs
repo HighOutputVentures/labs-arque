@@ -1,6 +1,7 @@
 mod store;
 mod controllers;
 mod server;
+mod stream;
 
 use server::Server;
 
