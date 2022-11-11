@@ -46,46 +46,16 @@ pub fn insert_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        store::{InsertEventError, ListAggregateEventsParams, Store},
-        stream::Stream,
-    };
+    use crate::{store::MockRocksDBStore, stream::MockKafkaStream};
     use arque_common::request_generated::{
         Event, EventArgs, InsertEventRequestBody, InsertEventRequestBodyArgs,
     };
-    use async_trait::async_trait;
+
     use chrono::Local;
     use flatbuffers::FlatBufferBuilder;
-    use rdkafka::error::KafkaError;
-    use rocksdb::Error;
+
     use rstest::*;
     use uuid::Uuid;
-    pub struct MockRocksDBStore;
-
-    impl Store for MockRocksDBStore {
-        fn insert_event(&self, params: InsertEventParams) -> Result<(), InsertEventError> {
-            println!("insert_event");
-            Ok(())
-        }
-
-        fn list_aggregate_events(
-            &self,
-            params: ListAggregateEventsParams,
-        ) -> Result<Vec<Vec<u8>>, Error> {
-            println!("list_aggregate_events");
-            Ok(vec![])
-        }
-    }
-
-    pub struct MockKafkaStream;
-
-    #[async_trait]
-    impl Stream for MockKafkaStream {
-        async fn send(&self, id: String, data: Vec<u8>) -> Result<(), KafkaError> {
-            println!("send");
-            Ok(())
-        }
-    }
 
     #[rstest]
     #[tokio::test]

@@ -43,23 +43,15 @@ pub fn list_aggregate_events(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{store::RocksDBStore, stream::KafkaStream};
+    use crate::{store::MockRocksDBStore, stream::MockKafkaStream};
     use arque_common::request_generated::ListAggregateEventsRequestBodyArgs;
     use flatbuffers::FlatBufferBuilder;
     use rstest::*;
     use uuid::Uuid;
-    use std::path::Path;
-
-    #[fixture]
-    fn open_db(#[default("./src/db")] path: &str) -> RocksDBStore {
-        let db = RocksDBStore::open(Path::new(path)).unwrap();
-
-        db
-    }
 
     #[rstest]
     #[tokio::test]
-    async fn list_aggregate_events_request_test(#[with("./src/db1")] open_db: RocksDBStore) {
+    async fn list_aggregate_events_request_test() {
         let mut bldr = FlatBufferBuilder::new();
 
         bldr.reset();
@@ -84,13 +76,9 @@ mod tests {
         let list_aggregate_events_request_body =
             flatbuffers::root::<ListAggregateEventsRequestBody>(data);
 
-        let stream = KafkaStream {
-            broker: "localhost:9092".to_string(),
-        };
-
         let controller_context = ControllerContext {
-            store: Box::new(open_db),
-            stream: Box::new(stream),
+            store: Box::new(MockRocksDBStore {}),
+            stream: Box::new(MockKafkaStream {}),
         };
 
         list_aggregate_events(
