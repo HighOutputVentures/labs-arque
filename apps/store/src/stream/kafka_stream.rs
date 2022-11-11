@@ -1,6 +1,4 @@
-mod stream;
-
-use crate::stream::Stream;
+use super::stream::Stream;
 
 use async_trait::async_trait;
 
@@ -18,7 +16,7 @@ fn producer(broker: &str) -> FutureProducer {
 }
 
 pub struct KafkaStream {
-    broker: String,
+    pub broker: String,
 }
 
 #[async_trait]
@@ -37,14 +35,14 @@ impl Stream for KafkaStream {
     }
 }
 
-#[tokio::main]
-async fn main() {
-    let stream = KafkaStream {
-        broker: "localhost:9092".to_string(),
-    };
+// #[tokio::main]
+// async fn main() {
+//     let stream = KafkaStream {
+//         broker: "localhost:9092".to_string(),
+//     };
 
-    stream
-        .send("demo".to_string(), vec![0, 1, 2])
-        .await
-        .unwrap();
-}
+//     stream
+//         .send("demo".to_string(), vec![0, 1, 2])
+//         .await
+//         .unwrap();
+// }

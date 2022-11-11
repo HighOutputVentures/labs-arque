@@ -3,7 +3,6 @@ use crate::store::InsertEventParams;
 use arque_common::request_generated::{Event, EventArgs, InsertEventRequestBody};
 use flatbuffers::FlatBufferBuilder;
 
-
 pub fn insert_event(
     ctx: &ControllerContext,
     body: &InsertEventRequestBody,
@@ -16,9 +15,9 @@ pub fn insert_event(
 
     let event_args = EventArgs {
         id: Some(bldr.create_vector(&event.id().unwrap())),
-        type_: 1u16,
+        type_: event.type_(),
         aggregate_id: Some(bldr.create_vector(&event.aggregate_id().unwrap())),
-        aggregate_version: 1u32,
+        aggregate_version: event.aggregate_version(),
         body: Some(bldr.create_vector(&event.body().unwrap())),
         metadata: Some(bldr.create_vector(&event.metadata().unwrap())),
         timestamp: event.timestamp(),
@@ -38,21 +37,27 @@ pub fn insert_event(
             payload: &event_vec, // this should be the entire event object
         })
         .unwrap();
+
+    ctx.stream
+        .send(hex::encode(event.aggregate_id().unwrap()), event_vec);
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::{
+        store::{RocksDBStore, Store},
+        stream::KafkaStream,
+    };
     use arque_common::request_generated::{
         Event, EventArgs, InsertEventRequestBody, InsertEventRequestBodyArgs,
     };
     use chrono::Local;
     use flatbuffers::FlatBufferBuilder;
     use rstest::*;
-    use uuid::Uuid;
-    use crate::store::RocksDBStore;
-    use super::*;
     use std::path::Path;
+    use uuid::Uuid;
 
     #[fixture]
     fn open_db(#[default("./src/db")] path: &str) -> RocksDBStore {
@@ -96,8 +101,13 @@ mod tests {
 
         let insert_event_request_body = flatbuffers::root::<InsertEventRequestBody>(data);
 
+        let stream = KafkaStream {
+            broker: "localhost:9092".to_string(),
+        };
+
         let controller_context = ControllerContext {
             store: Box::new(open_db),
+            stream: Box::new(stream),
         };
 
         insert_event(&controller_context, &insert_event_request_body.unwrap()).unwrap();
