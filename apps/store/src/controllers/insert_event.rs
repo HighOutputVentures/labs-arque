@@ -46,29 +46,20 @@ pub fn insert_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        store::{RocksDBStore, Store},
-        stream::KafkaStream,
-    };
+    use crate::{store::MockRocksDBStore, stream::MockKafkaStream};
     use arque_common::request_generated::{
         Event, EventArgs, InsertEventRequestBody, InsertEventRequestBodyArgs,
     };
+
     use chrono::Local;
     use flatbuffers::FlatBufferBuilder;
+
     use rstest::*;
-    use std::path::Path;
     use uuid::Uuid;
-
-    #[fixture]
-    fn open_db(#[default("./src/db")] path: &str) -> RocksDBStore {
-        let db = RocksDBStore::open(Path::new(path)).unwrap();
-
-        db
-    }
 
     #[rstest]
     #[tokio::test]
-    async fn insert_event_request_test(#[with("./src/db1")] open_db: RocksDBStore) {
+    async fn insert_event_request_test() {
         let mut bldr = FlatBufferBuilder::new();
 
         bldr.reset();
@@ -101,13 +92,9 @@ mod tests {
 
         let insert_event_request_body = flatbuffers::root::<InsertEventRequestBody>(data);
 
-        let stream = KafkaStream {
-            broker: "localhost:9092".to_string(),
-        };
-
         let controller_context = ControllerContext {
-            store: Box::new(open_db),
-            stream: Box::new(stream),
+            store: Box::new(MockRocksDBStore {}),
+            stream: Box::new(MockKafkaStream {}),
         };
 
         insert_event(&controller_context, &insert_event_request_body.unwrap()).unwrap();
