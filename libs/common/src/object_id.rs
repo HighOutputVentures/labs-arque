@@ -64,24 +64,47 @@ impl ObjectId {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use regex::Regex;
     use rstest::*;
 
     #[rstest]
     fn test_uniqueness() {
-        let p = ObjectId::new();
-        let x = ObjectId::new();
+        let object_id = ObjectId::new();
+        let dummy_object_id = ObjectId::new();
 
-        assert_ne!(p.id, x.id, "the two object ids should not be equal");
+        assert_ne!(
+            object_id.id, dummy_object_id.id,
+            "the two object ids should not be equal"
+        );
     }
 
     #[rstest]
     fn test_increment() {
-        let p = ObjectId::new();
-        let x = ObjectId::new();
+        let object_id = ObjectId::new();
+        let dummy_object_id = ObjectId::new();
 
         assert!(
-            p.id.last().unwrap() < x.id.last().unwrap(),
+            object_id.id.last().unwrap() < dummy_object_id.id.last().unwrap(),
             "the second object id should be greater than the first object id"
+        );
+    }
+
+    #[rstest]
+    fn test_to_str() {
+        let mut object_id = ObjectId::new();
+
+        let re = Regex::new(r"^[0-9a-fA-F]{24}$").unwrap();
+        assert!(re.is_match(object_id.to_str()));
+    }
+
+    #[rstest]
+    fn test_to_bytes() {
+        let object_id = ObjectId::new();
+
+        assert_eq!(
+            object_id.to_bytes().len(),
+            12,
+            "the object id bytes length should be equal to 12"
         );
     }
 }
