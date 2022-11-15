@@ -27,7 +27,6 @@ impl Client {
           let mut requests = requests.lock().unwrap();
 
           let message = socket.recv_multipart(0).unwrap();
-          println!("response: {:?}", message);
 
           if message.len() == 2 {
             let id: &[u8; 4] = message[0].as_slice().try_into().expect("unable to parse the request id");
@@ -84,7 +83,6 @@ impl Client {
     id.to_be_bytes().to_vec();
 
     socket.send(id.to_be_bytes().as_slice(), zmq::SNDMORE).unwrap();
-    println!("send: {:?}", id.to_be_bytes());
     socket.send(data, 0).unwrap();
 
     drop(socket);
@@ -114,7 +112,6 @@ mod tests {
 
         loop {
           let messages = socket.recv_multipart(0).unwrap();
-          println!("request: {:?}", messages);
 
           thread::sleep(Duration::from_millis(fastrand::u64(500..=1000)));
 

@@ -32,13 +32,15 @@ impl<'a> Server<'a> {
   }
 
   fn handle_request(&self, req: &[u8]) -> Result<Vec<u8>, Box<dyn Error + Send + Sync>> {
-    let req = root_as_request(req)?;
-    println!("request: {:?}", req.body_type());
+    let request = root_as_request(req)?;
+
+    println!("request: {:?}", request.body_type());
 
     Ok(vec![])
   }
 
   pub fn serve(&self, endpoint: String, shutdown: Receiver<()>) -> Result<(), Box<dyn Error + Send + Sync>> {
+
     let ctx = zmq::Context::new();
 
     let socket = ctx.socket(zmq::ROUTER)?;
@@ -46,19 +48,18 @@ impl<'a> Server<'a> {
     socket.bind(endpoint.as_str())?;
       
     loop {
-      if socket.poll(zmq::PollEvents::POLLIN, 0).expect("error occured while polling the scoket") != 0 {
+      if !shutdown.try_recv().is_err() {
+        break;
+      }
+
+      if socket.poll(zmq::PollEvents::POLLIN, 1000).unwrap() != 0 {
         let message = socket.recv_multipart(0).unwrap();
-        println!("request: {:?}", message);
 
         let response = self.handle_request(message[2].as_slice())?;
-  
+
         socket.send(message[0].as_slice(), zmq::SNDMORE).unwrap();
         socket.send(message[1].as_slice(), zmq::SNDMORE).unwrap();
         socket.send(response, 0).unwrap();
-      }
-
-      if !shutdown.try_recv().is_err() {
-        break;
       }
     }
   
