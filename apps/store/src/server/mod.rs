@@ -1,6 +1,8 @@
 use std::error::Error;
 use std::sync::mpsc::Receiver;
 use std::path::Path;
+use arque_common::request_generated::root_as_request;
+
 use crate::store::{Store,RocksDBStore};
 
 struct ControllerContext {
@@ -29,10 +31,11 @@ impl<'a> Server<'a> {
     }
   }
 
-  fn handle_request(&self, req: &[u8]) -> Vec<u8> {
-    println!("request: {:?}", req);
+  fn handle_request(&self, req: &[u8]) -> Result<Vec<u8>, Box<dyn Error + Send + Sync>> {
+    let req = root_as_request(req)?;
+    println!("request: {:?}", req.body_type());
 
-    vec![]
+    Ok(vec![])
   }
 
   pub fn serve(&self, endpoint: String, shutdown: Receiver<()>) -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -47,7 +50,7 @@ impl<'a> Server<'a> {
         let message = socket.recv_multipart(0).unwrap();
         println!("request: {:?}", message);
 
-        let response = self.handle_request(message[2].as_slice());
+        let response = self.handle_request(message[2].as_slice())?;
   
         socket.send(message[0].as_slice(), zmq::SNDMORE).unwrap();
         socket.send(message[1].as_slice(), zmq::SNDMORE).unwrap();

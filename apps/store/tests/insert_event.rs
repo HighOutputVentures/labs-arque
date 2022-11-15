@@ -7,7 +7,7 @@ use tempdir::TempDir;
 #[rstest]
 #[tokio::test]
 async fn test_insert_event() {
-  let (tx, rx) = channel::<()>();
+  let (shutdown_tx, shutdown_rx) = channel::<()>();
 
   std::thread::spawn(move || {
     let temp_dir = TempDir::new("arque").unwrap();
@@ -16,14 +16,14 @@ async fn test_insert_event() {
       data_path: Some(temp_dir.path())
     });
 
-    server.serve("tcp://*:4000".to_string(), rx).unwrap();
+    server.serve("tcp://*:4000".to_string(), shutdown_rx).unwrap();
   });
 
   let client = Client::connect("tcp://localhost:4000".to_string()).await.unwrap();
 
   client.send("hello world".as_bytes()).await.unwrap();
 
-  tx.send(()).unwrap();
+  shutdown_tx.send(()).unwrap();
 }
 
 #[rstest]

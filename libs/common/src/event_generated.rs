@@ -27,12 +27,12 @@ impl<'a> flatbuffers::Follow<'a> for Event<'a> {
 impl<'a> Event<'a> {
   pub const VT_ID: flatbuffers::VOffsetT = 4;
   pub const VT_TYPE_: flatbuffers::VOffsetT = 6;
-  pub const VT_TIMESTAMP: flatbuffers::VOffsetT = 8;
-  pub const VT_VERSION: flatbuffers::VOffsetT = 10;
-  pub const VT_AGGREGATE_ID: flatbuffers::VOffsetT = 12;
-  pub const VT_AGGREGATE_VERSION: flatbuffers::VOffsetT = 14;
-  pub const VT_BODY: flatbuffers::VOffsetT = 16;
-  pub const VT_METADATA: flatbuffers::VOffsetT = 18;
+  pub const VT_VERSION: flatbuffers::VOffsetT = 8;
+  pub const VT_AGGREGATE_ID: flatbuffers::VOffsetT = 10;
+  pub const VT_AGGREGATE_VERSION: flatbuffers::VOffsetT = 12;
+  pub const VT_BODY: flatbuffers::VOffsetT = 14;
+  pub const VT_METADATA: flatbuffers::VOffsetT = 16;
+  pub const VT_TIMESTAMP: flatbuffers::VOffsetT = 18;
 
   #[inline]
   pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -44,11 +44,11 @@ impl<'a> Event<'a> {
     args: &'args EventArgs<'args>
   ) -> flatbuffers::WIPOffset<Event<'bldr>> {
     let mut builder = EventBuilder::new(_fbb);
+    builder.add_timestamp(args.timestamp);
     if let Some(x) = args.metadata { builder.add_metadata(x); }
     if let Some(x) = args.body { builder.add_body(x); }
     builder.add_aggregate_version(args.aggregate_version);
     if let Some(x) = args.aggregate_id { builder.add_aggregate_id(x); }
-    builder.add_timestamp(args.timestamp);
     if let Some(x) = args.id { builder.add_id(x); }
     builder.add_type_(args.type_);
     builder.add_version(args.version);
@@ -63,10 +63,6 @@ impl<'a> Event<'a> {
   #[inline]
   pub fn type_(&self) -> u16 {
     self._tab.get::<u16>(Event::VT_TYPE_, Some(0)).unwrap()
-  }
-  #[inline]
-  pub fn timestamp(&self) -> u32 {
-    self._tab.get::<u32>(Event::VT_TIMESTAMP, Some(0)).unwrap()
   }
   #[inline]
   pub fn version(&self) -> u8 {
@@ -88,6 +84,10 @@ impl<'a> Event<'a> {
   pub fn metadata(&self) -> Option<&'a [u8]> {
     self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(Event::VT_METADATA, None).map(|v| v.safe_slice())
   }
+  #[inline]
+  pub fn timestamp(&self) -> u32 {
+    self._tab.get::<u32>(Event::VT_TIMESTAMP, Some(0)).unwrap()
+  }
 }
 
 impl flatbuffers::Verifiable for Event<'_> {
@@ -99,12 +99,12 @@ impl flatbuffers::Verifiable for Event<'_> {
     v.visit_table(pos)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("id", Self::VT_ID, false)?
      .visit_field::<u16>("type_", Self::VT_TYPE_, false)?
-     .visit_field::<u32>("timestamp", Self::VT_TIMESTAMP, false)?
      .visit_field::<u8>("version", Self::VT_VERSION, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("aggregate_id", Self::VT_AGGREGATE_ID, false)?
      .visit_field::<u32>("aggregate_version", Self::VT_AGGREGATE_VERSION, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("body", Self::VT_BODY, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("metadata", Self::VT_METADATA, false)?
+     .visit_field::<u32>("timestamp", Self::VT_TIMESTAMP, false)?
      .finish();
     Ok(())
   }
@@ -112,12 +112,12 @@ impl flatbuffers::Verifiable for Event<'_> {
 pub struct EventArgs<'a> {
     pub id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub type_: u16,
-    pub timestamp: u32,
     pub version: u8,
     pub aggregate_id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub aggregate_version: u32,
     pub body: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub metadata: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub timestamp: u32,
 }
 impl<'a> Default for EventArgs<'a> {
   #[inline]
@@ -125,12 +125,12 @@ impl<'a> Default for EventArgs<'a> {
     EventArgs {
       id: None,
       type_: 0,
-      timestamp: 0,
       version: 0,
       aggregate_id: None,
       aggregate_version: 0,
       body: None,
       metadata: None,
+      timestamp: 0,
     }
   }
 }
@@ -147,10 +147,6 @@ impl<'a: 'b, 'b> EventBuilder<'a, 'b> {
   #[inline]
   pub fn add_type_(&mut self, type_: u16) {
     self.fbb_.push_slot::<u16>(Event::VT_TYPE_, type_, 0);
-  }
-  #[inline]
-  pub fn add_timestamp(&mut self, timestamp: u32) {
-    self.fbb_.push_slot::<u32>(Event::VT_TIMESTAMP, timestamp, 0);
   }
   #[inline]
   pub fn add_version(&mut self, version: u8) {
@@ -173,6 +169,10 @@ impl<'a: 'b, 'b> EventBuilder<'a, 'b> {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Event::VT_METADATA, metadata);
   }
   #[inline]
+  pub fn add_timestamp(&mut self, timestamp: u32) {
+    self.fbb_.push_slot::<u32>(Event::VT_TIMESTAMP, timestamp, 0);
+  }
+  #[inline]
   pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> EventBuilder<'a, 'b> {
     let start = _fbb.start_table();
     EventBuilder {
@@ -192,12 +192,12 @@ impl core::fmt::Debug for Event<'_> {
     let mut ds = f.debug_struct("Event");
       ds.field("id", &self.id());
       ds.field("type_", &self.type_());
-      ds.field("timestamp", &self.timestamp());
       ds.field("version", &self.version());
       ds.field("aggregate_id", &self.aggregate_id());
       ds.field("aggregate_version", &self.aggregate_version());
       ds.field("body", &self.body());
       ds.field("metadata", &self.metadata());
+      ds.field("timestamp", &self.timestamp());
       ds.finish()
   }
 }
