@@ -4,15 +4,14 @@ table Event {
   aggregate_id:[ubyte];
   aggregate_version:uint32;
   body:[ubyte];
-  metadata:[ubyte];
-  timestamp:uint32;
+  meta:[ubyte];
 }
+
+table InsertEventResponseBody {}
 
 table ListAggregateEventsResponseBody {
   events:[Event];
 }
-
-table InsertEventResponseBody {}
 
 union ResponseBody {
   InsertEvent:InsertEventResponseBody,

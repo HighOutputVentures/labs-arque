@@ -13,8 +13,7 @@ pub struct GenerateFakeEventArgs {
   aggregate_id: Option<Vec<u8>>,
   aggregate_version: Option<u32>,
   body: Option<Vec<u8>>,
-  metadata: Option<Vec<u8>>,
-  timestamp: Option<u32>,
+  meta: Option<Vec<u8>>,
 }
 
 pub fn generate_fake_event<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
@@ -27,8 +26,7 @@ pub fn generate_fake_event<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
     aggregate_id: Some(fbb.create_vector(args.aggregate_id.as_ref().unwrap_or(&random_bytes(12)))),
     aggregate_version: args.aggregate_version.unwrap_or(fastrand::u32(..)),
     body: Some(fbb.create_vector(args.body.as_ref().unwrap_or(&random_bytes(1024)))),
-    metadata: Some(fbb.create_vector(args.metadata.as_ref().unwrap_or(&random_bytes(64)))),
-    timestamp: args.timestamp.unwrap_or(fastrand::u32(..)),
+    meta: Some(fbb.create_vector(args.meta.as_ref().unwrap_or(&random_bytes(64)))),
   };
 
   Event::create(fbb, &args)
