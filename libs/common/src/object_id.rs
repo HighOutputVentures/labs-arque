@@ -94,7 +94,7 @@ mod tests {
         let mut object_id = ObjectId::new();
 
         let re = Regex::new(r"^[0-9a-fA-F]{24}$").unwrap();
-        assert!(re.is_match(object_id.to_str()));
+        assert!(re.is_match(object_id.to_str()), "the object id string should match to the regex pattern");
     }
 
     #[rstest]
