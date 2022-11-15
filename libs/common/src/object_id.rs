@@ -68,6 +68,44 @@ mod tests {
     use rstest::*;
 
     #[rstest]
+    fn test_timestamp() {
+        let object_id = ObjectId::new();
+
+        let current_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            % 0xFFFFFFFF;
+
+        let timestamp = object_id.id[3] as u64
+            | (object_id.id[2] as u64) << 8
+            | (object_id.id[1] as u64) << 16
+            | (object_id.id[0] as u64) << 24;
+
+        assert_eq!(current_timestamp, timestamp, "the timestamp should be equal");
+    }
+
+    #[rstest]
+    fn test_machine_id() {
+        let object_id = ObjectId::new();
+
+        let machine_id =
+            object_id.id[6] as u32 | (object_id.id[5] as u32) << 8 | (object_id.id[4] as u32) << 16;
+
+        assert_eq!(machine_id, *MACHINE_ID, "the machine id should be equal");
+    }
+
+    #[rstest]
+    fn test_process_id() {
+        let object_id = ObjectId::new();
+
+        let process_id =
+            object_id.id[8] as u32 | (object_id.id[7] as u32) << 8;
+
+        assert_eq!(process_id, *PROCESS_ID, "the process id should be equal");
+    }
+
+    #[rstest]
     fn test_uniqueness() {
         let object_id = ObjectId::new();
         let dummy_object_id = ObjectId::new();
@@ -94,7 +132,10 @@ mod tests {
         let mut object_id = ObjectId::new();
 
         let re = Regex::new(r"^[0-9a-fA-F]{24}$").unwrap();
-        assert!(re.is_match(object_id.to_str()), "the object id string should match to the regex pattern");
+        assert!(
+            re.is_match(object_id.to_str()),
+            "the object id string should match to the regex pattern"
+        );
     }
 
     #[rstest]
