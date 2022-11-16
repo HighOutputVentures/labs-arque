@@ -51,7 +51,7 @@ mod tests {
 
     #[rstest]
     #[tokio::test]
-    async fn list_aggregate_events_request_test() {
+    async fn test_list_aggregate_events_request() {
         let mut bldr = FlatBufferBuilder::new();
 
         bldr.reset();

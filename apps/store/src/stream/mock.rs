@@ -6,7 +6,7 @@ pub struct MockKafkaStream;
 
 #[async_trait]
 impl Stream for MockKafkaStream {
-    async fn send(&self, id: String, data: Vec<u8>) -> Result<(), KafkaError> {
+    async fn send(&self, _id: String, _data: Vec<u8>) -> Result<(), KafkaError> {
         println!("send");
         Ok(())
     }

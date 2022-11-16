@@ -19,8 +19,7 @@ pub fn insert_event(
         aggregate_id: Some(bldr.create_vector(&event.aggregate_id().unwrap())),
         aggregate_version: event.aggregate_version(),
         body: Some(bldr.create_vector(&event.body().unwrap())),
-        metadata: Some(bldr.create_vector(&event.metadata().unwrap())),
-        timestamp: event.timestamp(),
+        meta: Some(bldr.create_vector(&event.meta().unwrap())),
     };
 
     let event_data = Event::create(&mut bldr, &event_args);
@@ -51,7 +50,6 @@ mod tests {
         Event, EventArgs, InsertEventRequestBody, InsertEventRequestBodyArgs,
     };
 
-    use chrono::Local;
     use flatbuffers::FlatBufferBuilder;
 
     use rstest::*;
@@ -59,7 +57,7 @@ mod tests {
 
     #[rstest]
     #[tokio::test]
-    async fn insert_event_request_test() {
+    async fn test_insert_event_request() {
         let mut bldr = FlatBufferBuilder::new();
 
         bldr.reset();
@@ -73,8 +71,7 @@ mod tests {
             aggregate_id: Some(bldr.create_vector(&aggregate_id.as_bytes().as_slice())),
             aggregate_version: 1u32,
             body: Some(bldr.create_vector(&Uuid::new_v4().as_bytes().as_slice())),
-            metadata: Some(bldr.create_vector(&Uuid::new_v4().as_bytes().as_slice())),
-            timestamp: Local::now().timestamp() as u32,
+            meta: Some(bldr.create_vector(&Uuid::new_v4().as_bytes().as_slice())),
         };
 
         let event_data = Event::create(&mut bldr, &event_args);
