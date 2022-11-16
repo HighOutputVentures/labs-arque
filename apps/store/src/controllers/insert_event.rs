@@ -28,17 +28,19 @@ pub fn insert_event(
 
     let event_vec = bldr.finished_data().to_vec();
 
-    ctx.store
-        .insert_event(InsertEventParams {
-            id: event.id().unwrap(),
-            aggregate_id: event.aggregate_id().unwrap(),
-            aggregate_version: event.aggregate_version(),
-            payload: &event_vec, // this should be the entire event object
-        })
-        .unwrap();
+    match ctx.store.insert_event(InsertEventParams {
+        id: event.id().unwrap(),
+        aggregate_id: event.aggregate_id().unwrap(),
+        aggregate_version: event.aggregate_version(),
+        payload: &event_vec, // this should be the entire event object
+    }) {
+        Err(e) => return Err(Box::new(e)),
+        Ok(()) => (),
+    };
 
     ctx.stream
         .send(hex::encode(event.aggregate_id().unwrap()), event_vec);
+
     Ok(())
 }
 
@@ -94,6 +96,10 @@ mod tests {
             stream: Box::new(MockKafkaStream {}),
         };
 
-        insert_event(&controller_context, &insert_event_request_body.unwrap()).unwrap();
+        assert_eq!(
+            insert_event(&controller_context, &insert_event_request_body.unwrap()).unwrap(),
+            (),
+            "insert_event should execute successfully"
+        );
     }
 }

@@ -4,4 +4,4 @@ mod store;
 mod stream;
 
 pub use server::{Server, ServerConfig};
-pub use store::{RocksDBStore, Store};
+pub use store::{InsertEventError, InsertEventParams, RocksDBStore, Store};

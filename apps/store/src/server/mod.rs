@@ -45,13 +45,18 @@ impl<'a> Server<'a> {
         let request = root_as_request(req).unwrap();
 
         if request.body_type() == RequestBody::InsertEvent {
-            insert_event(&self.context, &request.body_as_insert_event().unwrap()).unwrap();
+            match insert_event(&self.context, &request.body_as_insert_event().unwrap()) {
+                Err(e) => return Err(e.to_string().into()),
+                Ok(()) => return Ok(vec![]),
+            };
         } else if request.body_type() == RequestBody::ListAggregateEvents {
-            list_aggregate_events(
+            match list_aggregate_events(
                 &self.context,
                 &request.body_as_list_aggregate_events().unwrap(),
-            )
-            .unwrap();
+            ) {
+                Err(e) => return Err(e.to_string().into()),
+                Ok(()) => return Ok(vec![]),
+            };
         }
 
         Ok(vec![])
