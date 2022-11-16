@@ -114,9 +114,9 @@ mod helpers;
 mod tests {
 
     use super::*;
-    use arque_common::event_generated::{root_as_event, Event};
+    use arque_common::request_generated::Event;
     use flatbuffers::FlatBufferBuilder;
-    use helpers::generate_fake_insert_event_request;
+    use helpers::{generate_fake_event, GenerateFakeEventArgs};
     use rstest::*;
     use tempdir::TempDir;
     use uuid::Uuid;
@@ -131,10 +131,12 @@ mod tests {
 
     #[rstest]
     #[tokio::test]
-    async fn test_insert_event(open_db: RocksDBStore) {
+    async fn test_rocksdb_store_insert_event(open_db: RocksDBStore) {
         let mut fbb = FlatBufferBuilder::new();
-        let request = generate_fake_insert_event_request(&mut fbb);
-        fbb.finish(request, None);
+        let args = GenerateFakeEventArgs::default();
+
+        let event = generate_fake_event(&mut fbb, &args);
+        fbb.finish(event, None);
 
         let aggregate_id = Uuid::new_v4();
         let id = Uuid::new_v4();
@@ -151,46 +153,53 @@ mod tests {
         open_db.db.flush().expect("failed to flush");
     }
 
-    // #[rstest]
-    // #[tokio::test]
-    // async fn test_list_aggregate_events(open_db: RocksDBStore) {
-    //     let aggregate_id = Uuid::new_v4();
+    #[rstest]
+    #[tokio::test]
+    async fn test_rockdb_store_list_aggregate_events(open_db: RocksDBStore) {
+        let aggregate_id = Uuid::new_v4();
 
-    //     for i in 0..20 {
-    //         let mut fbb = FlatBufferBuilder::new();
-    //         let request = generate_fake_insert_event_request(&mut fbb);
-    //         fbb.finish(request, None);
+        for i in 0..20 {
+            let mut fbb = FlatBufferBuilder::new();
 
-    //         let id = Uuid::new_v4();
+            let mut args = GenerateFakeEventArgs::default();
 
-    //         let params = InsertEventParams {
-    //             aggregate_id: aggregate_id.as_bytes(),
-    //             id: id.as_bytes(),
-    //             payload: &fbb.finished_data().to_vec(),
-    //             aggregate_version: i,
-    //         };
+            args = GenerateFakeEventArgs {
+                aggregate_version: Some(i),
+                ..args
+            };
 
-    //         open_db.insert_event(params).expect("failed to save event");
-    //     }
+            let insert_event = generate_fake_event(&mut fbb, &args);
+            fbb.finish(insert_event, None);
 
-    //     let list_aggregate_events_params = ListAggregateEventsParams {
-    //         aggregate_id: aggregate_id.as_bytes(),
-    //         aggregate_version: Option::Some(5),
-    //         limit: 10,
-    //     };
+            let id = Uuid::new_v4();
 
-    //     let event_data = open_db
-    //         .list_aggregate_events(list_aggregate_events_params)
-    //         .expect("failed to query");
+            let params = InsertEventParams {
+                aggregate_id: aggregate_id.as_bytes(),
+                id: id.as_bytes(),
+                payload: &fbb.finished_data().to_vec(),
+                aggregate_version: i,
+            };
 
-    //     let events = event_data
-    //         .iter()
-    //         .map(|data| root_as_event(data).expect("failed to verify event"))
-    //         .collect::<Vec<Event>>();
+            open_db.insert_event(params).expect("failed to save event");
+        }
 
-    //     println!("event-len: {}", events.len());
-    //     assert_eq!(events.len(), 10);
+        let list_aggregate_events_params = ListAggregateEventsParams {
+            aggregate_id: aggregate_id.as_bytes(),
+            aggregate_version: Option::Some(5),
+            limit: 10,
+        };
 
-    //     open_db.db.flush().expect("failed to flush");
-    // }
+        let event_data = open_db
+            .list_aggregate_events(list_aggregate_events_params)
+            .expect("failed to query");
+
+        let events = event_data
+            .iter()
+            .map(|data| flatbuffers::root::<Event>(data).unwrap())
+            .collect::<Vec<Event>>();
+
+        assert_eq!(events.len(), 10);
+
+        open_db.db.flush().expect("failed to flush");
+    }
 }
