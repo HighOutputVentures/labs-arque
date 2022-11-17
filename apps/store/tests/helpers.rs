@@ -55,3 +55,22 @@ pub fn generate_fake_insert_event_request<'bldr: 'args, 'args: 'mut_bldr, 'mut_b
 
     Request::create(fbb, &args)
 }
+
+pub fn generate_fake_list_aggregate_events_request<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+  fbb: &'mut_bldr mut FlatBufferBuilder<'bldr>,
+) -> WIPOffset<Request<'args>> {
+  let args = GenerateFakeEventArgs::default();
+
+  let event = generate_fake_event(fbb, &args);
+
+  let args = InsertEventRequestBodyArgs { event: Some(event) };
+
+  let body = InsertEventRequestBody::create(fbb, &args);
+
+  let args = RequestArgs {
+      body: Some(body.as_union_value()),
+      body_type: RequestBody::InsertEvent,
+  };
+
+  Request::create(fbb, &args)
+}
