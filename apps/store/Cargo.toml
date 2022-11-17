@@ -20,6 +20,7 @@ fastrand = "1.8"
 mockall = "0.11.3"
 hex = "0.4.3"
 ctrlc = "3.2"
+get-port = "4.0.0"
 
 [dependencies.uuid]
 version = "1.1.2"

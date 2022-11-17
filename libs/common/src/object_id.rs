@@ -21,7 +21,7 @@ impl ObjectId {
         let time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
-            .as_secs()
+            .as_secs() as u32
             % 0xFFFFFFFF;
 
         let increment = unsafe {
@@ -57,26 +57,32 @@ impl ObjectId {
         hex::encode(&self.data)
     }
 
-    pub fn timestamp() -> u32 {
-        0
+    pub fn timestamp(&self) -> u32 {
+        self.data[3] as u32
+            | (self.data[2] as u32) << 8
+            | (self.data[1] as u32) << 16
+            | (self.data[0] as u32) << 24
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use super::*;
     use regex::Regex;
     use rstest::*;
 
     #[rstest]
     fn test_uniqueness() {
-        let object_id = ObjectId::new();
-        let dummy_object_id = ObjectId::new();
+        let mut set = BTreeSet::new();
 
-        assert_ne!(
-            object_id.data, dummy_object_id.data,
-            "the two object ids should not be equal"
-        );
+        for _n in 0..1000 {
+            let id = ObjectId::new();
+            set.insert(id.to_bytes().to_owned());
+        }
+
+        assert_eq!(set.len(), 1000, "the items of the set should be unique");
     }
 
     #[rstest]

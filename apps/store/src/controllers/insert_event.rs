@@ -19,8 +19,7 @@ pub fn insert_event(
         aggregate_id: Some(bldr.create_vector(&event.aggregate_id().unwrap())),
         aggregate_version: event.aggregate_version(),
         body: Some(bldr.create_vector(&event.body().unwrap())),
-        metadata: Some(bldr.create_vector(&event.metadata().unwrap())),
-        timestamp: event.timestamp(),
+        meta: Some(bldr.create_vector(&event.meta().unwrap())),
     };
 
     let event_data = Event::create(&mut bldr, &event_args);
@@ -29,17 +28,19 @@ pub fn insert_event(
 
     let event_vec = bldr.finished_data().to_vec();
 
-    ctx.store
-        .insert_event(InsertEventParams {
-            id: event.id().unwrap(),
-            aggregate_id: event.aggregate_id().unwrap(),
-            aggregate_version: event.aggregate_version(),
-            payload: &event_vec, // this should be the entire event object
-        })
-        .unwrap();
+    match ctx.store.insert_event(InsertEventParams {
+        id: event.id().unwrap(),
+        aggregate_id: event.aggregate_id().unwrap(),
+        aggregate_version: event.aggregate_version(),
+        payload: &event_vec, // this should be the entire event object
+    }) {
+        Err(e) => return Err(Box::new(e)),
+        Ok(()) => (),
+    };
 
     ctx.stream
         .send(hex::encode(event.aggregate_id().unwrap()), event_vec);
+
     Ok(())
 }
 
@@ -51,7 +52,6 @@ mod tests {
         Event, EventArgs, InsertEventRequestBody, InsertEventRequestBodyArgs,
     };
 
-    use chrono::Local;
     use flatbuffers::FlatBufferBuilder;
 
     use rstest::*;
@@ -59,7 +59,7 @@ mod tests {
 
     #[rstest]
     #[tokio::test]
-    async fn insert_event_request_test() {
+    async fn test_insert_event_request() {
         let mut bldr = FlatBufferBuilder::new();
 
         bldr.reset();
@@ -73,8 +73,7 @@ mod tests {
             aggregate_id: Some(bldr.create_vector(&aggregate_id.as_bytes().as_slice())),
             aggregate_version: 1u32,
             body: Some(bldr.create_vector(&Uuid::new_v4().as_bytes().as_slice())),
-            metadata: Some(bldr.create_vector(&Uuid::new_v4().as_bytes().as_slice())),
-            timestamp: Local::now().timestamp() as u32,
+            meta: Some(bldr.create_vector(&Uuid::new_v4().as_bytes().as_slice())),
         };
 
         let event_data = Event::create(&mut bldr, &event_args);
@@ -97,6 +96,10 @@ mod tests {
             stream: Box::new(MockKafkaStream {}),
         };
 
-        insert_event(&controller_context, &insert_event_request_body.unwrap()).unwrap();
+        assert_eq!(
+            insert_event(&controller_context, &insert_event_request_body.unwrap()).unwrap(),
+            (),
+            "insert_event should execute successfully"
+        );
     }
 }
