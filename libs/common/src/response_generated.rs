@@ -103,36 +103,44 @@ impl flatbuffers::SimpleToVerifyInSlice for ResponseBody {}
 pub struct ResponseBodyUnionTableOffset {}
 
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
-pub const ENUM_MIN_ERROR: i8 = 0;
+pub const ENUM_MIN_RESPONSE_STATUS: i8 = 0;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
-pub const ENUM_MAX_ERROR: i8 = 0;
+pub const ENUM_MAX_RESPONSE_STATUS: i8 = 2;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_ERROR: [Error; 1] = [
-  Error::InvalidAggregateVersion,
+pub const ENUM_VALUES_RESPONSE_STATUS: [ResponseStatus; 3] = [
+  ResponseStatus::Ok,
+  ResponseStatus::InvalidAggregateVersionError,
+  ResponseStatus::UnknownError,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[repr(transparent)]
-pub struct Error(pub i8);
+pub struct ResponseStatus(pub i8);
 #[allow(non_upper_case_globals)]
-impl Error {
-  pub const InvalidAggregateVersion: Self = Self(0);
+impl ResponseStatus {
+  pub const Ok: Self = Self(0);
+  pub const InvalidAggregateVersionError: Self = Self(1);
+  pub const UnknownError: Self = Self(2);
 
   pub const ENUM_MIN: i8 = 0;
-  pub const ENUM_MAX: i8 = 0;
+  pub const ENUM_MAX: i8 = 2;
   pub const ENUM_VALUES: &'static [Self] = &[
-    Self::InvalidAggregateVersion,
+    Self::Ok,
+    Self::InvalidAggregateVersionError,
+    Self::UnknownError,
   ];
   /// Returns the variant's name or "" if unknown.
   pub fn variant_name(self) -> Option<&'static str> {
     match self {
-      Self::InvalidAggregateVersion => Some("InvalidAggregateVersion"),
+      Self::Ok => Some("Ok"),
+      Self::InvalidAggregateVersionError => Some("InvalidAggregateVersionError"),
+      Self::UnknownError => Some("UnknownError"),
       _ => None,
     }
   }
 }
-impl core::fmt::Debug for Error {
+impl core::fmt::Debug for ResponseStatus {
   fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
     if let Some(name) = self.variant_name() {
       f.write_str(name)
@@ -141,7 +149,7 @@ impl core::fmt::Debug for Error {
     }
   }
 }
-impl<'a> flatbuffers::Follow<'a> for Error {
+impl<'a> flatbuffers::Follow<'a> for ResponseStatus {
   type Inner = Self;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
@@ -152,15 +160,15 @@ impl<'a> flatbuffers::Follow<'a> for Error {
   }
 }
 
-impl flatbuffers::Push for Error {
-    type Output = Error;
+impl flatbuffers::Push for ResponseStatus {
+    type Output = ResponseStatus;
     #[inline]
     fn push(&self, dst: &mut [u8], _rest: &[u8]) {
         unsafe { flatbuffers::emplace_scalar::<i8>(dst, self.0); }
     }
 }
 
-impl flatbuffers::EndianScalar for Error {
+impl flatbuffers::EndianScalar for ResponseStatus {
   #[inline]
   fn to_little_endian(self) -> Self {
     let b = i8::to_le(self.0);
@@ -174,7 +182,7 @@ impl flatbuffers::EndianScalar for Error {
   }
 }
 
-impl<'a> flatbuffers::Verifiable for Error {
+impl<'a> flatbuffers::Verifiable for ResponseStatus {
   #[inline]
   fn run_verifier(
     v: &mut flatbuffers::Verifier, pos: usize
@@ -184,7 +192,7 @@ impl<'a> flatbuffers::Verifiable for Error {
   }
 }
 
-impl flatbuffers::SimpleToVerifyInSlice for Error {}
+impl flatbuffers::SimpleToVerifyInSlice for ResponseStatus {}
 pub enum EventOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -538,7 +546,7 @@ impl<'a> flatbuffers::Follow<'a> for Response<'a> {
 }
 
 impl<'a> Response<'a> {
-  pub const VT_ERROR: flatbuffers::VOffsetT = 4;
+  pub const VT_STATUS: flatbuffers::VOffsetT = 4;
   pub const VT_BODY_TYPE: flatbuffers::VOffsetT = 6;
   pub const VT_BODY: flatbuffers::VOffsetT = 8;
 
@@ -554,14 +562,14 @@ impl<'a> Response<'a> {
     let mut builder = ResponseBuilder::new(_fbb);
     if let Some(x) = args.body { builder.add_body(x); }
     builder.add_body_type(args.body_type);
-    builder.add_error(args.error);
+    builder.add_status(args.status);
     builder.finish()
   }
 
 
   #[inline]
-  pub fn error(&self) -> Error {
-    self._tab.get::<Error>(Response::VT_ERROR, Some(Error::InvalidAggregateVersion)).unwrap()
+  pub fn status(&self) -> ResponseStatus {
+    self._tab.get::<ResponseStatus>(Response::VT_STATUS, Some(ResponseStatus::Ok)).unwrap()
   }
   #[inline]
   pub fn body_type(&self) -> ResponseBody {
@@ -600,7 +608,7 @@ impl flatbuffers::Verifiable for Response<'_> {
   ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
     use self::flatbuffers::Verifiable;
     v.visit_table(pos)?
-     .visit_field::<Error>("error", Self::VT_ERROR, false)?
+     .visit_field::<ResponseStatus>("status", Self::VT_STATUS, false)?
      .visit_union::<ResponseBody, _>("body_type", Self::VT_BODY_TYPE, "body", Self::VT_BODY, false, |key, v, pos| {
         match key {
           ResponseBody::InsertEvent => v.verify_union_variant::<flatbuffers::ForwardsUOffset<InsertEventResponseBody>>("ResponseBody::InsertEvent", pos),
@@ -613,7 +621,7 @@ impl flatbuffers::Verifiable for Response<'_> {
   }
 }
 pub struct ResponseArgs {
-    pub error: Error,
+    pub status: ResponseStatus,
     pub body_type: ResponseBody,
     pub body: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
 }
@@ -621,7 +629,7 @@ impl<'a> Default for ResponseArgs {
   #[inline]
   fn default() -> Self {
     ResponseArgs {
-      error: Error::InvalidAggregateVersion,
+      status: ResponseStatus::Ok,
       body_type: ResponseBody::NONE,
       body: None,
     }
@@ -634,8 +642,8 @@ pub struct ResponseBuilder<'a: 'b, 'b> {
 }
 impl<'a: 'b, 'b> ResponseBuilder<'a, 'b> {
   #[inline]
-  pub fn add_error(&mut self, error: Error) {
-    self.fbb_.push_slot::<Error>(Response::VT_ERROR, error, Error::InvalidAggregateVersion);
+  pub fn add_status(&mut self, status: ResponseStatus) {
+    self.fbb_.push_slot::<ResponseStatus>(Response::VT_STATUS, status, ResponseStatus::Ok);
   }
   #[inline]
   pub fn add_body_type(&mut self, body_type: ResponseBody) {
@@ -663,7 +671,7 @@ impl<'a: 'b, 'b> ResponseBuilder<'a, 'b> {
 impl core::fmt::Debug for Response<'_> {
   fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
     let mut ds = f.debug_struct("Response");
-      ds.field("error", &self.error());
+      ds.field("status", &self.status());
       ds.field("body_type", &self.body_type());
       match self.body_type() {
         ResponseBody::InsertEvent => {

@@ -18,10 +18,14 @@ union ResponseBody {
   ListAggregateEvents:ListAggregateEventsResponseBody,
 }
 
-enum Error : byte { InvalidAggregateVersion }
+enum ResponseStatus : byte {
+  Ok,
+  InvalidAggregateVersionError,
+  UnknownError
+}
 
 table Response {
-  error:Error;
+  status:ResponseStatus;
   body:ResponseBody;
 }
 

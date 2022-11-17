@@ -1,8 +1,9 @@
 use crate::{
-    controllers::{insert_event, list_aggregate_events, ControllerContext},
+    controllers::{insert_event, ControllerContext, InsertEventError},
     stream::KafkaStream,
 };
-use arque_common::request_generated::{root_as_request, RequestBody};
+use arque_common::{request_generated::{root_as_request, RequestBody}, response_generated::{Response, ResponseArgs, ResponseBody, ResponseStatus}};
+use flatbuffers::FlatBufferBuilder;
 use std::error::Error;
 use std::path::Path;
 use std::sync::mpsc::Receiver;
@@ -42,24 +43,46 @@ impl<'a> Server<'a> {
     }
 
     fn handle_request(&self, req: &[u8]) -> Result<Vec<u8>, Box<dyn Error + Send + Sync>> {
-        let request = root_as_request(req).unwrap();
+        let request = root_as_request(req)?;
 
-        if request.body_type() == RequestBody::InsertEvent {
-            match insert_event(&self.context, &request.body_as_insert_event().unwrap()) {
-                Err(e) => return Err(e.to_string().into()),
-                Ok(()) => return Ok(vec![]),
-            };
-        } else if request.body_type() == RequestBody::ListAggregateEvents {
-            match list_aggregate_events(
-                &self.context,
-                &request.body_as_list_aggregate_events().unwrap(),
-            ) {
-                Err(e) => return Err(e.to_string().into()),
-                Ok(()) => return Ok(vec![]),
-            };
-        }
+        let mut fbb = FlatBufferBuilder::new();
 
-        Ok(vec![])
+        let response = match request.body_type() {
+            RequestBody::InsertEvent => {
+                match insert_event(&self.context, &request.body_as_insert_event().unwrap()) {
+                    Err(e) => {
+                        match e {
+                            InsertEventError::InvalidAggregateVersion => Response::create(&mut fbb, &ResponseArgs {
+                                body_type: ResponseBody::InsertEvent,
+                                body: None,
+                                status: ResponseStatus::InvalidAggregateVersionError,
+                            }),
+                            _ => Response::create(&mut fbb, &ResponseArgs {
+                                body_type: ResponseBody::InsertEvent,
+                                body: None,
+                                status: ResponseStatus::UnknownError,
+                            })
+                        }
+                    },
+                    Ok(()) => Response::create(&mut fbb, &ResponseArgs {
+                        body_type: ResponseBody::InsertEvent,
+                        body: None,
+                        status: ResponseStatus::Ok,
+                    }),
+                }
+            },
+            _ => {
+                Response::create(&mut fbb, &ResponseArgs {
+                    body_type: ResponseBody::InsertEvent,
+                    body: None,
+                    status: ResponseStatus::UnknownError,
+                })
+            }
+        };
+
+        fbb.finish(response, None);
+
+        Ok(fbb.finished_data().to_owned())
     }
 
     pub fn serve(

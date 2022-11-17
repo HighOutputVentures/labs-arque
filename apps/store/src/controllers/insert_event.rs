@@ -2,11 +2,17 @@ use super::ControllerContext;
 use crate::store::InsertEventParams;
 use arque_common::request_generated::{Event, EventArgs, InsertEventRequestBody};
 use flatbuffers::FlatBufferBuilder;
+use custom_error::custom_error;
+
+custom_error! {pub InsertEventError
+    InvalidAggregateVersion = "invalid aggregate version",
+    Unknown{message:String} = "unkown: {message}"
+}
 
 pub fn insert_event(
     ctx: &ControllerContext,
     body: &InsertEventRequestBody,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), InsertEventError> {
     let event = body.event().unwrap();
 
     let mut bldr = FlatBufferBuilder::new();
@@ -28,18 +34,20 @@ pub fn insert_event(
 
     let event_vec = bldr.finished_data().to_vec();
 
-    match ctx.store.insert_event(InsertEventParams {
+    let params = InsertEventParams {
         id: event.id().unwrap(),
         aggregate_id: event.aggregate_id().unwrap(),
         aggregate_version: event.aggregate_version(),
         payload: &event_vec, // this should be the entire event object
-    }) {
-        Err(e) => return Err(Box::new(e)),
-        Ok(()) => (),
     };
 
-    ctx.stream
-        .send(hex::encode(event.aggregate_id().unwrap()), event_vec);
+    match ctx.store.insert_event(params) {
+        Err(_) => return Err(InsertEventError::InvalidAggregateVersion),
+        _ => (),
+    };
+
+    // ctx.stream
+    //     .send(hex::encode(event.aggregate_id().unwrap()), event_vec);
 
     Ok(())
 }
