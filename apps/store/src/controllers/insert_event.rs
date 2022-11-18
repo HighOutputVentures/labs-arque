@@ -6,7 +6,7 @@ use custom_error::custom_error;
 
 custom_error! {pub InsertEventError
     InvalidAggregateVersion = "invalid aggregate version",
-    Unknown{message:String} = "unkown: {message}"
+    Unknown{message:String} = "unknown: {message}"
 }
 
 pub fn insert_event(

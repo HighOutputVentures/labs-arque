@@ -1,17 +1,22 @@
 mod helpers;
 
-use arque_common::request_generated::{
-    InsertEventRequestBody, InsertEventRequestBodyArgs, Request, RequestArgs, RequestBody,
+use arque_common::{
+    request_generated::{
+        InsertEventRequestBody, InsertEventRequestBodyArgs, Request, RequestArgs, RequestBody,
+    },
+    response_generated::{root_as_response, ResponseStatus},
 };
 use arque_driver::Client;
-use arque_store::{InsertEventError, InsertEventParams, RocksDBStore, Server, ServerConfig, Store};
+use arque_store::{InsertEventParams, RocksDBStore, Server, ServerConfig, Store};
 use flatbuffers::FlatBufferBuilder;
 use get_port::{tcp::TcpPort, Ops};
-use helpers::{generate_fake_event, generate_fake_insert_event_request, GenerateFakeEventArgs};
+use helpers::{
+    generate_fake_event, generate_fake_insert_event_request, random_bytes, GenerateFakeEventArgs,
+};
+use rocksdb::Options;
 use rstest::*;
 use std::sync::mpsc::channel;
 use tempdir::TempDir;
-use uuid::Uuid;
 
 #[rstest]
 #[tokio::test]
@@ -42,7 +47,15 @@ async fn test_insert_event() {
     let request = generate_fake_insert_event_request(&mut fbb);
     fbb.finish(request, None);
 
-    client.send(fbb.finished_data()).await.unwrap();
+    let response_data = client.send(fbb.finished_data()).await.unwrap();
+
+    let response = root_as_response(&response_data).unwrap();
+
+    assert_eq!(
+        response.status(),
+        ResponseStatus::Ok,
+        "should return status Ok"
+    );
 
     stop_tx.send(()).unwrap();
 }
@@ -56,37 +69,38 @@ async fn test_invalid_aggregate_version() {
 
     let temp_dir = TempDir::new("arque_test").unwrap();
 
-    let store = RocksDBStore::open(temp_dir.path()).unwrap();
-
     let mut input_fbb = FlatBufferBuilder::new();
 
-    let args = GenerateFakeEventArgs::default();
+    let args = GenerateFakeEventArgs {
+        id: Some(random_bytes(12)),
+        type_: Some(fastrand::u16(..)),
+        aggregate_id: Some(random_bytes(12)),
+        aggregate_version: Some(fastrand::u32(..)),
+        body: Some(random_bytes(1024)),
+        meta: Some(random_bytes(64)),
+    };
+    let temp = args.clone();
 
-    let event = generate_fake_event(&mut input_fbb, &args);
+    let event = generate_fake_event(&mut input_fbb, &temp);
+
+    println!("input_event: {:?}", event.to_be_bytes());
 
     input_fbb.finish(event, None);
 
-    let aggregate_id = Uuid::new_v4();
-    let id = Uuid::new_v4();
-
     let params = InsertEventParams {
-        aggregate_id: aggregate_id.as_bytes(),
-        id: id.as_bytes(),
+        aggregate_id: &args.aggregate_id.clone().unwrap(),
+        id: &args.id.clone().unwrap(),
         payload: &input_fbb.finished_data().to_vec(),
-        aggregate_version: 1,
+        aggregate_version: args.aggregate_version.clone().unwrap(),
     };
 
-    store.insert_event(params).unwrap();
+    let server = Server::new(ServerConfig {
+        data_path: Some(temp_dir.path()),
+    });
 
     std::thread::spawn(move || {
-        let temp_dir = TempDir::new("arque_test").unwrap();
-
         let mut server_endpoint = String::from("tcp://*:");
         server_endpoint.push_str(&tcp_port.to_string());
-
-        let server = Server::new(ServerConfig {
-            data_path: Some(temp_dir.path()),
-        });
 
         server.serve(server_endpoint, stop_rx).unwrap();
     });
@@ -98,24 +112,34 @@ async fn test_invalid_aggregate_version() {
 
     let mut fbb = FlatBufferBuilder::new();
 
-    let event = generate_fake_event(&mut fbb, &args);
+    let insert_event_body = generate_fake_event(&mut fbb, &args);
 
-    let args = InsertEventRequestBodyArgs { event: Some(event) };
+    println!("send_event: {:?}", insert_event_body.to_be_bytes());
 
-    let body = InsertEventRequestBody::create(&mut fbb, &args);
+    let insert_event_request_body_args = InsertEventRequestBodyArgs {
+        event: Some(insert_event_body),
+    };
 
-    let args = RequestArgs {
+    let body = InsertEventRequestBody::create(&mut fbb, &insert_event_request_body_args);
+
+    let request_args = RequestArgs {
         body: Some(body.as_union_value()),
         body_type: RequestBody::InsertEvent,
     };
 
-    let request = Request::create(&mut fbb, &args);
+    let request = Request::create(&mut fbb, &request_args);
 
     fbb.finish(request, None);
 
-    let e = client.send(fbb.finished_data()).await.unwrap_err();
+    let response_data = client.send(fbb.finished_data()).await.unwrap();
 
-    println!("error: {:?}", e);
+    let response = root_as_response(&response_data).unwrap();
+
+    assert_eq!(
+        response.status(),
+        ResponseStatus::InvalidAggregateVersionError,
+        "should return status InvalidAggregateVersionError"
+    );
 
     stop_tx.send(()).unwrap();
 }

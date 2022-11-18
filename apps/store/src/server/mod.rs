@@ -1,8 +1,14 @@
 use crate::{
-    controllers::{insert_event, ControllerContext, InsertEventError},
+    controllers::{insert_event, list_aggregate_events, ControllerContext, InsertEventError},
     stream::KafkaStream,
 };
-use arque_common::{request_generated::{root_as_request, RequestBody}, response_generated::{Response, ResponseArgs, ResponseBody, ResponseStatus}};
+use arque_common::{
+    request_generated::{root_as_request, RequestBody},
+    response_generated::{
+        InsertEventResponseBody, InsertEventResponseBodyArgs, ListAggregateEventsResponseBody,
+        ListAggregateEventsResponseBodyArgs, Response, ResponseArgs, ResponseBody, ResponseStatus,
+    },
+};
 use flatbuffers::FlatBufferBuilder;
 use std::error::Error;
 use std::path::Path;
@@ -49,35 +55,92 @@ impl<'a> Server<'a> {
 
         let response = match request.body_type() {
             RequestBody::InsertEvent => {
+                let insert_event_response_body =
+                    InsertEventResponseBody::create(&mut fbb, &InsertEventResponseBodyArgs {});
+
                 match insert_event(&self.context, &request.body_as_insert_event().unwrap()) {
-                    Err(e) => {
-                        match e {
-                            InsertEventError::InvalidAggregateVersion => Response::create(&mut fbb, &ResponseArgs {
-                                body_type: ResponseBody::InsertEvent,
-                                body: None,
-                                status: ResponseStatus::InvalidAggregateVersionError,
-                            }),
-                            _ => Response::create(&mut fbb, &ResponseArgs {
-                                body_type: ResponseBody::InsertEvent,
-                                body: None,
-                                status: ResponseStatus::UnknownError,
-                            })
+                    Err(e) => match e {
+                        InsertEventError::InvalidAggregateVersion => {
+                            println!("H-Error: InvalidAggregateVersion");
+
+                            Response::create(
+                                &mut fbb,
+                                &ResponseArgs {
+                                    body_type: ResponseBody::InsertEvent,
+                                    body: Some(insert_event_response_body.as_union_value()),
+                                    status: ResponseStatus::InvalidAggregateVersionError,
+                                },
+                            )
                         }
+                        _ => Response::create(
+                            &mut fbb,
+                            &ResponseArgs {
+                                body_type: ResponseBody::InsertEvent,
+                                body: Some(insert_event_response_body.as_union_value()),
+                                status: ResponseStatus::UnknownError,
+                            },
+                        ),
                     },
-                    Ok(()) => Response::create(&mut fbb, &ResponseArgs {
-                        body_type: ResponseBody::InsertEvent,
-                        body: None,
-                        status: ResponseStatus::Ok,
-                    }),
+                    Ok(()) => {
+                        println!("H-Ok");
+                        Response::create(
+                            &mut fbb,
+                            &ResponseArgs {
+                                body_type: ResponseBody::InsertEvent,
+                                body: Some(insert_event_response_body.as_union_value()),
+                                status: ResponseStatus::Ok,
+                            },
+                        )
+                    }
                 }
-            },
-            _ => {
-                Response::create(&mut fbb, &ResponseArgs {
+            }
+
+            // RequestBody::ListAggregateEvents => {
+            //     let mut list_aggregate_events_response_body =
+            //         ListAggregateEventsResponseBody::create(
+            //             &mut fbb,
+            //             &ListAggregateEventsResponseBodyArgs { events: todo!() },
+            //         );
+
+            //     match list_aggregate_events(
+            //         &self.context,
+            //         &request.body_as_list_aggregate_events().unwrap(),
+            //     ) {
+            //         Err(e) => Response::create(
+            //             &mut fbb,
+            //             &ResponseArgs {
+            //                 body_type: ResponseBody::ListAggregateEvents,
+            //                 body: Some(list_aggregate_events_response_body.as_union_value()),
+            //                 status: ResponseStatus::UnknownError,
+            //             },
+            //         ),
+            //         Ok(data) => {
+
+            //             list_aggregate_events_response_body =
+            //                 ListAggregateEventsResponseBody::create(
+            //                     &mut fbb,
+            //                     &ListAggregateEventsResponseBodyArgs { events:  },
+            //                 );
+
+            //             Response::create(
+            //                 &mut fbb,
+            //                 &ResponseArgs {
+            //                     body_type: ResponseBody::ListAggregateEvents,
+            //                     body: Some(list_aggregate_events_response_body.as_union_value()),
+            //                     status: ResponseStatus::Ok,
+            //                 },
+            //             )
+            //         }
+            //     }
+            // }
+            _ => Response::create(
+                &mut fbb,
+                &ResponseArgs {
                     body_type: ResponseBody::InsertEvent,
                     body: None,
                     status: ResponseStatus::UnknownError,
-                })
-            }
+                },
+            ),
         };
 
         fbb.finish(response, None);

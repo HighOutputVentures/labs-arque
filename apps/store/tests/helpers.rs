@@ -9,7 +9,7 @@ pub fn random_bytes(len: usize) -> Vec<u8> {
     repeat_with(|| fastrand::u8(..)).take(len).collect()
 }
 
-#[derive(Default)]
+#[derive(Debug, Default, Clone)]
 pub struct GenerateFakeEventArgs {
     pub id: Option<Vec<u8>>,
     pub type_: Option<u16>,
