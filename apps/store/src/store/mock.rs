@@ -19,5 +19,3 @@ impl Store for MockRocksDBStore {
         Ok(vec![])
     }
 }
-
-

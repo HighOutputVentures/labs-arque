@@ -13,7 +13,6 @@ use get_port::{tcp::TcpPort, Ops};
 use helpers::{
     generate_fake_event, generate_fake_insert_event_request, random_bytes, GenerateFakeEventArgs,
 };
-use rocksdb::Options;
 use rstest::*;
 use std::sync::mpsc::channel;
 use tempdir::TempDir;
@@ -69,6 +68,8 @@ async fn test_invalid_aggregate_version() {
 
     let temp_dir = TempDir::new("arque_test").unwrap();
 
+    let store = RocksDBStore::open(temp_dir.path()).unwrap();
+
     let mut input_fbb = FlatBufferBuilder::new();
 
     let args = GenerateFakeEventArgs {
@@ -83,8 +84,6 @@ async fn test_invalid_aggregate_version() {
 
     let event = generate_fake_event(&mut input_fbb, &temp);
 
-    println!("input_event: {:?}", event.to_be_bytes());
-
     input_fbb.finish(event, None);
 
     let params = InsertEventParams {
@@ -94,20 +93,19 @@ async fn test_invalid_aggregate_version() {
         aggregate_version: args.aggregate_version.clone().unwrap(),
     };
 
-    let mutex = std::sync::Mutex::new(Server::new(ServerConfig {
-        data_path: Some(temp_dir.path()),
-    }));
+    store.insert_event(params).unwrap();
 
-    let arc = std::sync::Arc::new(mutex);
-    let arc_cloned = std::sync::Arc::clone(&arc);
+    drop(store);
 
     std::thread::spawn(move || {
         let mut server_endpoint = String::from("tcp://*:");
         server_endpoint.push_str(&tcp_port.to_string());
 
-        let server_context = arc_cloned.lock().unwrap();
+        let server = Server::new(ServerConfig {
+            data_path: Some(temp_dir.path()),
+        });
 
-        server_context.serve(server_endpoint, stop_rx).unwrap();
+        server.serve(server_endpoint, stop_rx).unwrap();
     });
 
     let mut client_endpoint = String::from("tcp://localhost:");
@@ -118,8 +116,6 @@ async fn test_invalid_aggregate_version() {
     let mut fbb = FlatBufferBuilder::new();
 
     let insert_event_body = generate_fake_event(&mut fbb, &args);
-
-    println!("send_event: {:?}", insert_event_body.to_be_bytes());
 
     let insert_event_request_body_args = InsertEventRequestBodyArgs {
         event: Some(insert_event_body),
