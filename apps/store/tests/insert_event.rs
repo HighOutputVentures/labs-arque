@@ -94,15 +94,20 @@ async fn test_invalid_aggregate_version() {
         aggregate_version: args.aggregate_version.clone().unwrap(),
     };
 
-    let server = Server::new(ServerConfig {
+    let mutex = std::sync::Mutex::new(Server::new(ServerConfig {
         data_path: Some(temp_dir.path()),
-    });
+    }));
+
+    let arc = std::sync::Arc::new(mutex);
+    let arc_cloned = std::sync::Arc::clone(&arc);
 
     std::thread::spawn(move || {
         let mut server_endpoint = String::from("tcp://*:");
         server_endpoint.push_str(&tcp_port.to_string());
 
-        server.serve(server_endpoint, stop_rx).unwrap();
+        let server_context = arc_cloned.lock().unwrap();
+
+        server_context.serve(server_endpoint, stop_rx).unwrap();
     });
 
     let mut client_endpoint = String::from("tcp://localhost:");
