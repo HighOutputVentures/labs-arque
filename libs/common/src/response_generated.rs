@@ -105,12 +105,13 @@ pub struct ResponseBodyUnionTableOffset {}
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_RESPONSE_STATUS: i8 = 0;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
-pub const ENUM_MAX_RESPONSE_STATUS: i8 = 2;
+pub const ENUM_MAX_RESPONSE_STATUS: i8 = 3;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_RESPONSE_STATUS: [ResponseStatus; 3] = [
+pub const ENUM_VALUES_RESPONSE_STATUS: [ResponseStatus; 4] = [
   ResponseStatus::Ok,
   ResponseStatus::InvalidAggregateVersionError,
+  ResponseStatus::BadRequestError,
   ResponseStatus::UnknownError,
 ];
 
@@ -121,13 +122,15 @@ pub struct ResponseStatus(pub i8);
 impl ResponseStatus {
   pub const Ok: Self = Self(0);
   pub const InvalidAggregateVersionError: Self = Self(1);
-  pub const UnknownError: Self = Self(2);
+  pub const BadRequestError: Self = Self(2);
+  pub const UnknownError: Self = Self(3);
 
   pub const ENUM_MIN: i8 = 0;
-  pub const ENUM_MAX: i8 = 2;
+  pub const ENUM_MAX: i8 = 3;
   pub const ENUM_VALUES: &'static [Self] = &[
     Self::Ok,
     Self::InvalidAggregateVersionError,
+    Self::BadRequestError,
     Self::UnknownError,
   ];
   /// Returns the variant's name or "" if unknown.
@@ -135,6 +138,7 @@ impl ResponseStatus {
     match self {
       Self::Ok => Some("Ok"),
       Self::InvalidAggregateVersionError => Some("InvalidAggregateVersionError"),
+      Self::BadRequestError => Some("BadRequestError"),
       Self::UnknownError => Some("UnknownError"),
       _ => None,
     }

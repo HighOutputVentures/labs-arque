@@ -21,6 +21,7 @@ union ResponseBody {
 enum ResponseStatus : byte {
   Ok,
   InvalidAggregateVersionError,
+  BadRequestError,
   UnknownError
 }
 
