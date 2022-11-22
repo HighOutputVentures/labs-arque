@@ -1,27 +1,28 @@
 mod client;
 
+pub use arque_common::request_generated::Event;
 pub use client::Client;
 
 pub struct Driver {
-  client: Option<Client>;
+  client: Option<Client>,
 }
 
 impl Driver {
-  pub new(endpoint: String) -> Self {
+  pub fn new(endpoint: String) {
 
   }
 
-  pub async connect(&self) {
+  pub async fn connect(&self) {
 
   }
 
-  pub async close(&self) {
+  pub async fn close(&self) {
 
   }
 
-  pub async insert_event(event: Event) {
+  pub async fn insert_event<'a>(event: Event<'a>) {
   }
 
-  pub async list_aggregate_events(event: Event) {
+  pub async fn list_aggregate_events<'a>(event: Event<'a>) {
   }
 }
