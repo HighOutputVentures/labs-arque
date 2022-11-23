@@ -30,10 +30,7 @@ impl Driver {
 
         let ctx = match client {
             Some(context) => context,
-            None => {
-                let client_context = Client::connect(endpoint).await.unwrap();
-                client_context
-            }
+            None => Client::connect(endpoint).await.unwrap(),
         };
 
         self.client = Some(ctx);
