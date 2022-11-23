@@ -13,32 +13,28 @@ pub fn insert_event(
     ctx: &ControllerContext,
     body: &InsertEventRequestBody,
 ) -> Result<(), InsertEventError> {
-    let event = body.event().unwrap();
+    let event = body.event().expect("event should not be None");
 
     let mut bldr = FlatBufferBuilder::new();
 
-    bldr.reset();
-
-    let event_args = EventArgs {
-        id: Some(bldr.create_vector(&event.id().unwrap())),
+    let args = EventArgs {
+        id: Some(bldr.create_vector(event.id().expect("event.id should not be None"))),
         type_: event.type_(),
-        aggregate_id: Some(bldr.create_vector(&event.aggregate_id().unwrap())),
+        aggregate_id: Some(bldr.create_vector(event.aggregate_id().expect("event.aggregate_id should not be None"))),
         aggregate_version: event.aggregate_version(),
-        body: Some(bldr.create_vector(&event.body().unwrap())),
-        meta: Some(bldr.create_vector(&event.meta().unwrap())),
+        body: Some(bldr.create_vector(event.body().expect("event.body should not be None"))),
+        meta: event.meta().map(|meta| bldr.create_vector(meta)),
     };
 
-    let event_data = Event::create(&mut bldr, &event_args);
+    let event_ = Event::create(&mut bldr, &args);
 
-    bldr.finish(event_data, None);
-
-    let event_vec = bldr.finished_data().to_vec();
+    bldr.finish(event_, None);
 
     let params = InsertEventParams {
-        id: event.id().unwrap(),
-        aggregate_id: event.aggregate_id().unwrap(),
+        id: event.id().expect("event.id should not be None"),
+        aggregate_id: event.aggregate_id().expect("event.aggregate_id should not be None"),
         aggregate_version: event.aggregate_version(),
-        payload: &event_vec, // this should be the entire event object
+        payload: &bldr.finished_data().to_vec(),
     };
 
     match ctx.store.insert_event(params) {

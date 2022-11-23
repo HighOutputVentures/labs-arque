@@ -2,7 +2,8 @@ use custom_error::custom_error;
 use rocksdb::Error;
 
 custom_error! {pub InsertEventError
-  InvalidAggregateVersion = "invalid aggregate version"
+  InvalidAggregateVersion = "invalid aggregate version",
+  Unexpected{message:String} = "unexpected: {message}"
 }
 
 pub struct ListAggregateEventsParams<'a> {

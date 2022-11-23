@@ -26,24 +26,32 @@ impl RocksDBStore {
 
 impl Store for RocksDBStore {
     fn insert_event(&self, params: InsertEventParams) -> Result<(), InsertEventError> {
-        let mut batch = WriteBatch::default();
+        let cf1 = match self.db.cf_handle("events") {
+            Some(cf) => cf,
+            None => return Err(InsertEventError::Unexpected { message: "`events` column family should exist".to_string() }),
+        };
 
-        let cf1 = self.db.cf_handle("events").unwrap();
-        let cf2 = self.db.cf_handle("aggregate_events").unwrap();
-        let cf3 = self.db.cf_handle("aggregate_version").unwrap();
+        let cf2 = match self.db.cf_handle("aggregate_events") {
+            Some(cf) => cf,
+            None => return Err(InsertEventError::Unexpected { message: "`aggregate_events` column family should exist".to_string() }),
+        };
 
-        match self.db.get_pinned_cf(cf3, params.aggregate_id) {
-            Ok(Some(aggregate_version)) => {
-                if params
-                    .aggregate_version
-                    .ne(&(BigEndian::read_u32(&aggregate_version) + 1))
-                {
-                    return Err(InsertEventError::InvalidAggregateVersion);
-                }
-            }
-            Ok(None) => println!("value not found"),
-            Err(e) => panic!("failed to query: {}", e),
+        let cf3 = match self.db.cf_handle("aggregate_version") {
+            Some(cf) => cf,
+            None => return Err(InsertEventError::Unexpected { message: "`aggregate_version` column family should exist".to_string() }),
+        };
+
+        let aggregate_version = match self.db.get_pinned_cf(cf3, params.aggregate_id) {
+            Ok(Some(aggregate_version)) => BigEndian::read_u32(&aggregate_version),
+            Ok(None) => 0,
+            Err(e) => return Err(InsertEventError::Unexpected { message: format!("unable to retrieve `aggregate_version`:\n{}", e) }),
+        };
+
+        if params.aggregate_version != aggregate_version + 1 {
+            return Err(InsertEventError::InvalidAggregateVersion);
         }
+
+        let mut batch = WriteBatch::default();
 
         batch.put_cf(cf1, params.id, params.payload);
         batch.put_cf(
@@ -57,7 +65,10 @@ impl Store for RocksDBStore {
             params.aggregate_version.to_be_bytes(),
         );
 
-        self.db.write(batch).expect("failed to write");
+        match self.db.write(batch) {
+            Err(e) => return Err(InsertEventError::Unexpected { message: format!("unable to write to database:\n{}", e) }),
+            _ => ()
+        };
 
         Ok(())
     }
@@ -114,7 +125,7 @@ mod helpers;
 mod tests {
 
     use super::*;
-    use arque_common::request_generated::Event;
+    use arque_common::{request_generated::Event, object_id::ObjectId};
     use flatbuffers::FlatBufferBuilder;
     use helpers::{generate_fake_event, GenerateFakeEventArgs};
     use rstest::*;
@@ -138,14 +149,14 @@ mod tests {
         let event = generate_fake_event(&mut fbb, &args);
         fbb.finish(event, None);
 
-        let aggregate_id = Uuid::new_v4();
-        let id = Uuid::new_v4();
+        let id = ObjectId::new();
+        let aggregate_id = ObjectId::new();
 
         let params = InsertEventParams {
-            aggregate_id: aggregate_id.as_bytes(),
-            id: id.as_bytes(),
-            payload: &fbb.finished_data().to_vec(),
+            id: id.to_bytes(),
+            aggregate_id: aggregate_id.to_bytes(),
             aggregate_version: 1,
+            payload: &fbb.finished_data().to_vec(),
         };
 
         open_db.insert_event(params).expect("failed to save event");
