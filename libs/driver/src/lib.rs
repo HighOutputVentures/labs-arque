@@ -92,7 +92,7 @@ impl Driver {
 
 #[cfg(test)]
 mod tests {
-    use std::{iter::repeat_with, sync::mpsc::channel, thread};
+    use std::{iter::repeat_with, sync::mpsc::{channel, Receiver}, thread};
 
     use super::*;
     use arque_common::response_generated::{
@@ -106,55 +106,62 @@ mod tests {
         repeat_with(|| fastrand::u8(..)).take(len).collect()
     }
 
+    pub fn server(
+        endpoint: String,
+        shutdown: Receiver<()>,
+        response: Vec<u8>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let ctx = zmq::Context::new();
+
+        let socket = ctx.socket(zmq::ROUTER)?;
+
+        socket.bind(endpoint.as_str())?;
+
+        loop {
+            if !shutdown.try_recv().is_err() {
+                break;
+            }
+
+            if socket.poll(zmq::PollEvents::POLLIN, 1000).unwrap() != 0 {
+                let message = socket.recv_multipart(0).unwrap();
+
+                socket.send(message[0].as_slice(), zmq::SNDMORE).unwrap();
+                socket.send(message[1].as_slice(), zmq::SNDMORE).unwrap();
+                socket.send(response.to_owned(), 0).unwrap();
+            }
+        }
+
+        Ok(())
+    }
+
     #[rstest]
     #[tokio::test]
     async fn test_driver_insert_event() {
         let tcp_port = TcpPort::any("127.0.0.1").unwrap();
         let (stop_tx, stop_rx) = channel::<()>();
 
+        let response = {
+            let mut fbb = FlatBufferBuilder::new();
+
+            let insert_event_response_body =
+                InsertEventResponseBody::create(&mut fbb, &InsertEventResponseBodyArgs {});
+
+            let response = Response::create(
+                &mut fbb,
+                &ResponseArgs {
+                    body_type: ResponseBody::InsertEvent,
+                    body: Some(insert_event_response_body.as_union_value()),
+                    status: ResponseStatus::Ok,
+                },
+            );
+            fbb.finish(response, None);
+            fbb.finished_data().to_owned()
+        };
+
         thread::spawn(move || {
-            let ctx = zmq::Context::new();
-
-            let socket = ctx.socket(zmq::ROUTER).unwrap();
-
             let mut server_endpoint = String::from("tcp://*:");
             server_endpoint.push_str(&tcp_port.to_string());
-
-            socket.bind(server_endpoint.as_str()).unwrap();
-
-            loop {
-                if !stop_rx.try_recv().is_err() {
-                    break;
-                }
-
-                if socket.poll(zmq::PollEvents::POLLIN, 1000).unwrap() != 0 {
-                    let message = socket.recv_multipart(0).unwrap();
-
-                    let response = {
-                        let mut fbb = FlatBufferBuilder::new();
-
-                        let insert_event_response_body = InsertEventResponseBody::create(
-                            &mut fbb,
-                            &InsertEventResponseBodyArgs {},
-                        );
-
-                        let response = Response::create(
-                            &mut fbb,
-                            &ResponseArgs {
-                                body_type: ResponseBody::InsertEvent,
-                                body: Some(insert_event_response_body.as_union_value()),
-                                status: ResponseStatus::Ok,
-                            },
-                        );
-                        fbb.finish(response, None);
-                        fbb.finished_data().to_owned()
-                    };
-
-                    socket.send(message[0].as_slice(), zmq::SNDMORE).unwrap();
-                    socket.send(message[1].as_slice(), zmq::SNDMORE).unwrap();
-                    socket.send(response, 0).unwrap();
-                }
-            }
+            server(server_endpoint, stop_rx, response).unwrap();
         });
 
         let mut client_endpoint = String::from("tcp://localhost:");
