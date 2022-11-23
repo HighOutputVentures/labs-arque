@@ -1,27 +1,194 @@
 mod client;
+use std::error::Error;
 
+use arque_common::{
+    request_generated::{
+        Event, EventArgs, InsertEventRequestBody, InsertEventRequestBodyArgs, Request, RequestArgs,
+        RequestBody,
+    },
+    response_generated::{root_as_response, ResponseStatus},
+};
 pub use client::Client;
+use flatbuffers::FlatBufferBuilder;
 
 pub struct Driver {
-  client: Option<Client>;
+    client: Option<Client>,
+    endpoint: String,
 }
 
 impl Driver {
-  pub new(endpoint: String) -> Self {
+    pub fn new(endpoint: String) -> Self {
+        Self {
+            client: None,
+            endpoint,
+        }
+    }
 
-  }
+    async fn get_client(&mut self) -> &Client {
+        let client = self.client.clone();
+        let endpoint = self.endpoint.clone();
 
-  pub async connect(&self) {
+        let ctx = match client {
+            Some(context) => context,
+            None => {
+                let client_context = Client::connect(endpoint).await.unwrap();
+                client_context
+            }
+        };
 
-  }
+        self.client = Some(ctx);
 
-  pub async close(&self) {
+        self.client.as_ref().unwrap()
+    }
 
-  }
+    pub async fn connect(&self) {}
 
-  pub async insert_event(event: Event) {
-  }
+    pub async fn close(&self) {}
 
-  pub async list_aggregate_events(event: Event) {
-  }
+    pub async fn insert_event(
+        &mut self,
+        event: Event<'_>,
+    ) -> Result<ResponseStatus, Box<dyn Error>> {
+        let client = self.get_client().await;
+
+        let mut fbb = FlatBufferBuilder::new();
+
+        let event_args = EventArgs {
+            id: Some(fbb.create_vector(event.id().unwrap())),
+            type_: event.type_(),
+            aggregate_id: Some(fbb.create_vector(event.aggregate_id().unwrap())),
+            aggregate_version: event.aggregate_version(),
+            body: Some(fbb.create_vector(event.body().unwrap())),
+            meta: Some(fbb.create_vector(event.meta().unwrap())),
+        };
+
+        let insert_event_request_body_args = InsertEventRequestBodyArgs {
+            event: Some(Event::create(&mut fbb, &event_args)),
+        };
+
+        let request_args = RequestArgs {
+            body: Some(
+                InsertEventRequestBody::create(&mut fbb, &insert_event_request_body_args)
+                    .as_union_value(),
+            ),
+            body_type: RequestBody::InsertEvent,
+        };
+
+        let request = Request::create(&mut fbb, &request_args);
+
+        fbb.finish(request, None);
+
+        let response_data = client.send(fbb.finished_data()).await.unwrap();
+
+        match root_as_response(&response_data) {
+            Ok(response) => Ok(response.status()),
+
+            Err(e) => Err(Box::new(e)),
+        }
+    }
+
+    pub async fn list_aggregate_events<'a>(_event: Event<'a>) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{iter::repeat_with, sync::mpsc::channel, thread};
+
+    use super::*;
+    use arque_common::response_generated::{
+        InsertEventResponseBody, InsertEventResponseBodyArgs, Response, ResponseArgs, ResponseBody,
+    };
+
+    use get_port::{tcp::TcpPort, Ops};
+    use rstest::*;
+
+    pub fn random_bytes(len: usize) -> Vec<u8> {
+        repeat_with(|| fastrand::u8(..)).take(len).collect()
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn test_driver_insert_event() {
+        let tcp_port = TcpPort::any("127.0.0.1").unwrap();
+        let (stop_tx, stop_rx) = channel::<()>();
+
+        thread::spawn(move || {
+            let ctx = zmq::Context::new();
+
+            let socket = ctx.socket(zmq::ROUTER).unwrap();
+
+            let mut server_endpoint = String::from("tcp://*:");
+            server_endpoint.push_str(&tcp_port.to_string());
+
+            socket.bind(server_endpoint.as_str()).unwrap();
+
+            loop {
+                if !stop_rx.try_recv().is_err() {
+                    break;
+                }
+
+                if socket.poll(zmq::PollEvents::POLLIN, 1000).unwrap() != 0 {
+                    let message = socket.recv_multipart(0).unwrap();
+
+                    let response = {
+                        let mut fbb = FlatBufferBuilder::new();
+
+                        let insert_event_response_body = InsertEventResponseBody::create(
+                            &mut fbb,
+                            &InsertEventResponseBodyArgs {},
+                        );
+
+                        let response = Response::create(
+                            &mut fbb,
+                            &ResponseArgs {
+                                body_type: ResponseBody::InsertEvent,
+                                body: Some(insert_event_response_body.as_union_value()),
+                                status: ResponseStatus::Ok,
+                            },
+                        );
+                        fbb.finish(response, None);
+                        fbb.finished_data().to_owned()
+                    };
+
+                    socket.send(message[0].as_slice(), zmq::SNDMORE).unwrap();
+                    socket.send(message[1].as_slice(), zmq::SNDMORE).unwrap();
+                    socket.send(response, 0).unwrap();
+                }
+            }
+        });
+
+        let mut client_endpoint = String::from("tcp://localhost:");
+        client_endpoint.push_str(&tcp_port.to_string());
+
+        let mut driver = Driver::new(client_endpoint);
+
+        let mut fbb = FlatBufferBuilder::new();
+
+        let event_args = EventArgs {
+            id: Some(fbb.create_vector(&random_bytes(12))),
+            type_: fastrand::u16(..),
+            aggregate_id: Some(fbb.create_vector(&random_bytes(12))),
+            aggregate_version: fastrand::u32(..),
+            body: Some(fbb.create_vector(&random_bytes(1024))),
+            meta: Some(fbb.create_vector(&random_bytes(64))),
+        };
+
+        let event = Event::create(&mut fbb, &event_args);
+
+        fbb.finish(event, None);
+
+        let event_data = fbb.finished_data();
+
+        let event = flatbuffers::root::<Event>(event_data).unwrap();
+
+        let container = driver.insert_event(event).await.unwrap();
+
+        assert_eq!(
+            container,
+            ResponseStatus::Ok,
+            "should return response status ok"
+        );
+
+        stop_tx.send(()).unwrap();
+    }
 }
