@@ -3,8 +3,8 @@ use std::error::Error;
 
 use arque_common::{
     request_generated::{
-        Event, EventArgs, InsertEventRequestBody, InsertEventRequestBodyArgs, Request, RequestArgs,
-        RequestBody,
+        Event, EventBuilder, InsertEventRequestBody, InsertEventRequestBodyArgs, Request,
+        RequestArgs, RequestBody,
     },
     response_generated::{root_as_response, ResponseStatus},
 };
@@ -51,19 +51,12 @@ impl Driver {
     ) -> Result<ResponseStatus, Box<dyn Error>> {
         let client = self.get_client().await;
 
-        let mut fbb = FlatBufferBuilder::new();
+        let mut fbb = FlatBufferBuilder::from_vec(event._tab.buf.to_vec());
 
-        let event_args = EventArgs {
-            id: Some(fbb.create_vector(event.id().unwrap())),
-            type_: event.type_(),
-            aggregate_id: Some(fbb.create_vector(event.aggregate_id().unwrap())),
-            aggregate_version: event.aggregate_version(),
-            body: Some(fbb.create_vector(event.body().unwrap())),
-            meta: Some(fbb.create_vector(event.meta().unwrap())),
-        };
+        let event_builder = EventBuilder::new(&mut fbb);
 
         let insert_event_request_body_args = InsertEventRequestBodyArgs {
-            event: Some(Event::create(&mut fbb, &event_args)),
+            event: Some(event_builder.finish()),
         };
 
         let request_args = RequestArgs {
@@ -92,11 +85,19 @@ impl Driver {
 
 #[cfg(test)]
 mod tests {
-    use std::{iter::repeat_with, sync::mpsc::{channel, Receiver}, thread};
+    use std::{
+        iter::repeat_with,
+        sync::mpsc::{channel, Receiver},
+        thread,
+    };
 
     use super::*;
-    use arque_common::response_generated::{
-        InsertEventResponseBody, InsertEventResponseBodyArgs, Response, ResponseArgs, ResponseBody,
+    use arque_common::{
+        request_generated::EventArgs,
+        response_generated::{
+            InsertEventResponseBody, InsertEventResponseBodyArgs, Response, ResponseArgs,
+            ResponseBody,
+        },
     };
 
     use get_port::{tcp::TcpPort, Ops};
