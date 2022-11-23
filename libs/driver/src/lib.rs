@@ -45,9 +45,9 @@ impl Driver {
 
     pub async fn close(&self) {}
 
-    pub async fn insert_event(
+    pub async fn insert_event<'a>(
         &mut self,
-        event: Event<'_>,
+        event: Event<'a>,
     ) -> Result<ResponseStatus, Box<dyn Error>> {
         let client = self.get_client().await;
 
