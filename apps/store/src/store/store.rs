@@ -1,15 +1,26 @@
+use arque_common::event_generated::Event;
 use custom_error::custom_error;
-use rocksdb::Error;
+use rocksdb::{Error};
 
 custom_error! {pub InsertEventError
   InvalidAggregateVersion = "invalid aggregate version",
   Unexpected{message:String} = "unexpected: {message}"
 }
 
+custom_error! {pub ListAggregateEventsError
+    Unexpected{message:String} = "unexpected: {message}"
+  }
+
 pub struct ListAggregateEventsParams<'a> {
     pub aggregate_id: &'a [u8],
     pub aggregate_version: Option<u32>,
     pub limit: usize,
+}
+
+pub struct ListAggregateEventsParamsNext<'a> {
+    pub aggregate_id: &'a [u8],
+    pub aggregate_version: Option<u32>,
+    pub limit: Option<usize>,
 }
 
 pub struct InsertEventParams<'a> {
@@ -25,4 +36,8 @@ pub trait Store {
         &self,
         params: ListAggregateEventsParams,
     ) -> Result<Vec<Vec<u8>>, Error>;
+    fn list_aggregate_events_next<'a>(
+        &self,
+        params: &ListAggregateEventsParamsNext,
+    ) -> Result<Vec<Event<'a>>, ListAggregateEventsError>;
 }
