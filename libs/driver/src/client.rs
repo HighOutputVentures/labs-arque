@@ -72,7 +72,7 @@ impl Client {
         Ok(client)
     }
 
-    pub async fn send(&self, data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    pub async fn send(&self, data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error + Send>> {
         let id = fastrand::u32(..);
 
         let (tx, rx) = oneshot::channel::<Vec<u8>>();
@@ -93,7 +93,7 @@ impl Client {
 
         drop(socket);
 
-        let response = rx.await.unwrap();
+        let response = rx.recv().unwrap();
 
         Ok(response)
     }

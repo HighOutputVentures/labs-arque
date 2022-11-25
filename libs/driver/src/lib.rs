@@ -1,5 +1,4 @@
 mod client;
-use std::error::Error;
 
 use arque_common::{
     request_generated::{
@@ -9,8 +8,12 @@ use arque_common::{
     response_generated::{root_as_response, ResponseStatus},
 };
 pub use client::Client;
+use custom_error::custom_error;
 use flatbuffers::FlatBufferBuilder;
 
+custom_error! {pub InsertEventError
+    Unknown{message:String} = "unknown: {message}"
+}
 pub struct Driver {
     client: Option<Client>,
     endpoint: String,
@@ -45,7 +48,7 @@ impl Driver {
     pub async fn insert_event<'a>(
         &mut self,
         event: Event<'a>,
-    ) -> Result<ResponseStatus, Box<dyn Error>> {
+    ) -> Result<ResponseStatus, InsertEventError> {
         let client = self.get_client().await;
 
         let mut fbb = FlatBufferBuilder::from_vec(event._tab.buf.to_vec());
@@ -73,7 +76,9 @@ impl Driver {
         match root_as_response(&response_data) {
             Ok(response) => Ok(response.status()),
 
-            Err(e) => Err(Box::new(e)),
+            Err(_) => Err(InsertEventError::Unknown {
+                message: "Invalid Flatbuffer".to_string(),
+            }),
         }
     }
 
@@ -82,12 +87,6 @@ impl Driver {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        iter::repeat_with,
-        sync::mpsc::{channel, Receiver},
-        thread,
-    };
-
     use super::*;
     use arque_common::{
         request_generated::EventArgs,
@@ -95,6 +94,12 @@ mod tests {
             InsertEventResponseBody, InsertEventResponseBodyArgs, Response, ResponseArgs,
             ResponseBody,
         },
+    };
+    use std::error::Error;
+    use std::{
+        iter::repeat_with,
+        sync::mpsc::{channel, Receiver},
+        thread,
     };
 
     use get_port::{tcp::TcpPort, Ops};
