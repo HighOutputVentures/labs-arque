@@ -379,6 +379,7 @@ version = "0.1.0"
 dependencies = [
  "arque_common",
  "arque_driver",
+ "fastrand",
  "flatbuffers",
  "neon",
  "once_cell",
