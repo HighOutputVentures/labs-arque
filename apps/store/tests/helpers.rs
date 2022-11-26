@@ -29,7 +29,7 @@ pub fn generate_fake_event<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
         aggregate_id: Some(
             fbb.create_vector(args.aggregate_id.as_ref().unwrap_or(&random_bytes(12))),
         ),
-        aggregate_version: args.aggregate_version.unwrap_or(fastrand::u32(..)),
+        aggregate_version: args.aggregate_version.unwrap_or(1),
         body: Some(fbb.create_vector(args.body.as_ref().unwrap_or(&random_bytes(1024)))),
         meta: Some(fbb.create_vector(args.meta.as_ref().unwrap_or(&random_bytes(64)))),
     };
@@ -37,6 +37,7 @@ pub fn generate_fake_event<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
     Event::create(fbb, &args)
 }
 
+#[allow(dead_code)]
 pub fn generate_fake_insert_event_request<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
     fbb: &'mut_bldr mut FlatBufferBuilder<'bldr>,
 ) -> WIPOffset<Request<'args>> {
@@ -54,23 +55,4 @@ pub fn generate_fake_insert_event_request<'bldr: 'args, 'args: 'mut_bldr, 'mut_b
     };
 
     Request::create(fbb, &args)
-}
-
-pub fn generate_fake_list_aggregate_events_request<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-  fbb: &'mut_bldr mut FlatBufferBuilder<'bldr>,
-) -> WIPOffset<Request<'args>> {
-  let args = GenerateFakeEventArgs::default();
-
-  let event = generate_fake_event(fbb, &args);
-
-  let args = InsertEventRequestBodyArgs { event: Some(event) };
-
-  let body = InsertEventRequestBody::create(fbb, &args);
-
-  let args = RequestArgs {
-      body: Some(body.as_union_value()),
-      body_type: RequestBody::InsertEvent,
-  };
-
-  Request::create(fbb, &args)
 }
