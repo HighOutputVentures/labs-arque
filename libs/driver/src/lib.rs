@@ -1,13 +1,15 @@
 mod client;
 
+pub use client::Client;
+
 use arque_common::{
     request_generated::{
-        Event, EventBuilder, InsertEventRequestBody, InsertEventRequestBodyArgs, Request,
-        RequestArgs, RequestBody,
+        Event, EventArgs, InsertEventRequestBody, InsertEventRequestBodyArgs, Request, RequestArgs,
+        RequestBody,
     },
     response_generated::{root_as_response, ResponseStatus},
 };
-pub use client::Client;
+
 use custom_error::custom_error;
 use flatbuffers::FlatBufferBuilder;
 
@@ -51,19 +53,28 @@ impl Driver {
     ) -> Result<ResponseStatus, InsertEventError> {
         let client = self.get_client().await;
 
-        let mut fbb = FlatBufferBuilder::from_vec(event._tab.buf.to_vec());
-
-        let event_builder = EventBuilder::new(&mut fbb);
-
-        let insert_event_request_body_args = InsertEventRequestBodyArgs {
-            event: Some(event_builder.finish()),
+        let mut fbb = FlatBufferBuilder::new();
+        let event_args = EventArgs {
+            id: Some(fbb.create_vector(event.id().unwrap())),
+            type_: event.type_(),
+            aggregate_id: Some(fbb.create_vector(event.aggregate_id().unwrap())),
+            aggregate_version: event.aggregate_version(),
+            body: Some(fbb.create_vector(event.body().unwrap())),
+            meta: Some(fbb.create_vector(event.meta().unwrap())),
         };
 
+        let event_object = Event::create(&mut fbb, &event_args);
+
+        let insert_event_request_body_args = InsertEventRequestBodyArgs {
+            event: Some(event_object),
+        };
+
+        let insert_event_request_body =
+            InsertEventRequestBody::create(&mut fbb, &insert_event_request_body_args)
+                .as_union_value();
+
         let request_args = RequestArgs {
-            body: Some(
-                InsertEventRequestBody::create(&mut fbb, &insert_event_request_body_args)
-                    .as_union_value(),
-            ),
+            body: Some(insert_event_request_body),
             body_type: RequestBody::InsertEvent,
         };
 
@@ -71,7 +82,9 @@ impl Driver {
 
         fbb.finish(request, None);
 
-        let response_data = client.send(fbb.finished_data()).await.unwrap();
+        let payload = fbb.finished_data();
+
+        let response_data = client.send(payload).await.unwrap();
 
         match root_as_response(&response_data) {
             Ok(response) => Ok(response.status()),
@@ -164,6 +177,7 @@ mod tests {
         thread::spawn(move || {
             let mut server_endpoint = String::from("tcp://*:");
             server_endpoint.push_str(&tcp_port.to_string());
+
             server(server_endpoint, stop_rx, response).unwrap();
         });
 
@@ -178,9 +192,9 @@ mod tests {
             id: Some(fbb.create_vector(&random_bytes(12))),
             type_: fastrand::u16(..),
             aggregate_id: Some(fbb.create_vector(&random_bytes(12))),
-            aggregate_version: fastrand::u32(..),
-            body: Some(fbb.create_vector(&random_bytes(1024))),
-            meta: Some(fbb.create_vector(&random_bytes(64))),
+            aggregate_version: 1,
+            body: Some(fbb.create_vector(&random_bytes(12))),
+            meta: Some(fbb.create_vector(&random_bytes(12))),
         };
 
         let event = Event::create(&mut fbb, &event_args);
@@ -189,12 +203,12 @@ mod tests {
 
         let event_data = fbb.finished_data();
 
-        let event = flatbuffers::root::<Event>(event_data).unwrap();
+        let event_object = flatbuffers::root::<Event>(event_data).unwrap();
 
-        let container = driver.insert_event(event).await.unwrap();
+        let response_status = driver.insert_event(event_object).await.unwrap();
 
         assert_eq!(
-            container,
+            response_status,
             ResponseStatus::Ok,
             "should return response status ok"
         );
