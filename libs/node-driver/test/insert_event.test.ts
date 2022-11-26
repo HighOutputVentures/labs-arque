@@ -1,33 +1,18 @@
-const insertEvent = require('..');
+import { ArqueDriver } from '../src';
 
 describe('fn insertEvent() Test', () => {
-  it.concurrent('should print return promise of Event Object', () => {
-    const event = insertEvent.insertEvent();
+  it.concurrent('should print return promise of Event Object', async () => {
+    let arqueDriver = new ArqueDriver('tcp://127.0.0.1:4000');
 
-    const event_object = {
-      id: [1, 2, 3, 4, 5],
-      type: 1,
-      timestamp: 12345,
-      aggregate_id: [1, 2, 3, 4, 5],
-      aggregate_version: 1,
-      body: [1, 2, 3, 4, 5],
-      metadata: [1, 2, 3, 4, 5],
-      version: 1,
-    };
+    let response = await arqueDriver.insertEvent({
+      id: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      type_: 1,
+      aggregateId: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      aggregateVersion: 1,
+      body: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      meta: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    });
 
-    expect(event).resolves.toHaveProperty('id', event_object.id);
-    expect(event).resolves.toHaveProperty('type', event_object.type);
-    expect(event).resolves.toHaveProperty('timestamp', event_object.timestamp);
-    expect(event).resolves.toHaveProperty(
-      'aggregate_id',
-      event_object.aggregate_id,
-    );
-    expect(event).resolves.toHaveProperty(
-      'aggregate_version',
-      event_object.aggregate_version,
-    );
-    expect(event).resolves.toHaveProperty('body', event_object.body);
-    expect(event).resolves.toHaveProperty('metadata', event_object.metadata);
-    expect(event).resolves.toHaveProperty('version', event_object.version);
+    expect(response).toEqual(0);
   });
 });

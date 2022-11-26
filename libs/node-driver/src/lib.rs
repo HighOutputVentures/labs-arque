@@ -1,12 +1,12 @@
-use arque_common::{
-    request_generated::{Event, EventArgs},
-    response_generated::ResponseStatus,
-};
+use std::sync::Arc;
+
+use arque_common::request_generated::{Event, EventArgs};
 use arque_driver::Driver;
+use casual_logger::Log;
 use flatbuffers::FlatBufferBuilder;
-use neon::prelude::*;
+use neon::{prelude::*, types::Deferred};
 use once_cell::sync::OnceCell;
-use tokio::runtime::Runtime;
+use tokio::{runtime::Runtime, sync::Mutex};
 
 #[allow(dead_code)]
 fn vec_to_js_array<'b>(v: &[u8], cx: &mut FunctionContext<'b>) -> JsResult<'b, JsArray> {
@@ -20,7 +20,10 @@ fn vec_to_js_array<'b>(v: &[u8], cx: &mut FunctionContext<'b>) -> JsResult<'b, J
     Ok(arr)
 }
 
-fn js_array_to_vec<'a, 'b>(js_array: Handle<'a, JsArray>, cx: &mut FunctionContext<'b>) -> Vec<u8> {
+fn js_array_to_vec<'a, C>(js_array: Handle<'a, JsArray>, cx: &mut C) -> Vec<u8>
+where
+    C: Context<'a>,
+{
     let js_array_vec = js_array.to_vec(cx).unwrap();
 
     let mut vecx: Vec<u8> = Vec::new();
@@ -65,8 +68,8 @@ fn runtime<'a, C: Context<'a>>(cx: &mut C) -> NeonResult<&'static Runtime> {
     RUNTIME.get_or_try_init(|| Runtime::new().or_else(|err| cx.throw_error(err.to_string())))
 }
 
-struct ArqueDriver {
-    driver: Driver,
+pub struct ArqueDriver {
+    driver: Arc<Mutex<Driver>>,
 }
 
 impl Finalize for ArqueDriver {
@@ -78,41 +81,27 @@ impl ArqueDriver {
         let driver_context = Driver::new(endpoint.unwrap_or("tcp://127.0.0.1:4000".to_string()));
 
         Self {
-            driver: driver_context,
+            driver: Arc::new(Mutex::new(driver_context)),
         }
     }
 
-    // pub async fn insert_event<'a>(
-    //     &mut self,
-    //     event: Event<'a>,
-    // ) -> Result<ResponseStatus, Box<dyn std::error::Error + Send>> {
-    //     let driver = &mut  self.driver.lock().await;
-    //     driver.insert_event(event).await
-    // }
-}
+    pub fn insert_event<'a, C: Context<'a>>(
+        &'a self,
+        mut cx: C,
+        deffered: Deferred,
+        event_object: Handle<'a, JsObject>,
+    ) -> JsResult<JsUndefined> {
+        let runtime = runtime(&mut cx).unwrap();
+        let channel = cx.channel();
+        let driver_context = Arc::clone(&self.driver);
 
-impl ArqueDriver {
-    pub fn js_new(mut cx: FunctionContext) -> JsResult<JsBox<ArqueDriver>> {
-        let arque_driver = ArqueDriver::new(None);
-
-        Ok(cx.boxed(arque_driver))
-    }
-
-    pub fn js_insert_event<'c>(mut cx: FunctionContext<'c>) -> JsResult<JsPromise> {
-        // let arque_driver = cx.argument::<JsBox<ArqueDriver>>(0)?;
-
-        // let arque_driver = (&**cx.argument::<JsBox<ArqueDriver>>(0)?).clone();
-        // let mut driver = arque_driver.driver.unwrap();
-
-        let event_object = cx.argument::<JsObject>(1)?;
-
-        let js_id: Handle<JsArray> = event_object.get(&mut cx, "id")?;
-        let js_type_: Handle<JsNumber> = event_object.get(&mut cx, "type_")?;
-        let js_aggregate_id: Handle<JsArray> = event_object.get(&mut cx, "aggregateId")?;
+        let js_id: Handle<JsArray> = event_object.get(&mut cx, "id").unwrap();
+        let js_type_: Handle<JsNumber> = event_object.get(&mut cx, "type_").unwrap();
+        let js_aggregate_id: Handle<JsArray> = event_object.get(&mut cx, "aggregateId").unwrap();
         let js_aggregate_version: Handle<JsNumber> =
-            event_object.get(&mut cx, "aggregateVersion")?;
-        let js_body: Handle<JsArray> = event_object.get(&mut cx, "body")?;
-        let js_meta: Handle<JsArray> = event_object.get(&mut cx, "meta")?;
+            event_object.get(&mut cx, "aggregateVersion").unwrap();
+        let js_body: Handle<JsArray> = event_object.get(&mut cx, "body").unwrap();
+        let js_meta: Handle<JsArray> = event_object.get(&mut cx, "meta").unwrap();
 
         let rust_id = js_array_to_vec(js_id, &mut cx);
         let rust_type_ = js_type_.value(&mut cx) as u16;
@@ -121,18 +110,14 @@ impl ArqueDriver {
         let rust_body = js_array_to_vec(js_body, &mut cx);
         let rust_meta = js_array_to_vec(js_meta, &mut cx);
 
-        let (deffered, promise) = cx.promise();
+        let idxx = rust_id.clone();
 
-        let runtime = runtime(&mut cx)?;
-        let channel = cx.channel();
+        Log::trace(&format!("main_thread: {:?}", idxx));
 
-        // temporary
-        let arque_driver = ArqueDriver::new(None);
-        let mut driver = arque_driver.driver;
-
-        // Spawn a thread to complete the execution. This will _not_ block the
-        // JavaScript event loop.
         runtime.spawn(async move {
+            let idxx = rust_id.clone();
+            Log::trace(&format!("spawn_thread: {:?}", idxx));
+
             let mut fbb = FlatBufferBuilder::new();
 
             let event_args = EventArgs {
@@ -152,32 +137,47 @@ impl ArqueDriver {
 
             let event = flatbuffers::root::<Event>(event_data).unwrap();
 
+            let mut driver = driver_context.lock().await;
+
             let result = driver.insert_event(event).await;
 
             deffered.settle_with(&channel, move |mut cx| {
                 //Convert a `reqwest::Error` to a JavaScript exception
                 let response_status = result.or_else(|err| cx.throw_error(err.to_string()))?;
 
-                match response_status {
-                    // Resolve the promise with the release date
-                    ResponseStatus::Ok => Ok(cx.number(0)),
-                    _ => Ok(cx.number(-1)),
-                }
-                // Ok(cx.number(0))
+                Ok(cx.number(response_status.0))
             });
         });
 
-        // deffered.resolve(&mut cx, idx_js_array.unwrap());
-
-        Ok(promise)
+        Ok(cx.undefined())
     }
+}
+
+pub fn js_driver_new(mut cx: FunctionContext) -> JsResult<JsBox<ArqueDriver>> {
+    let endpoint = cx.argument::<JsString>(0)?;
+
+    let arque_driver = ArqueDriver::new(Some(endpoint.value(&mut cx)));
+
+    Ok(cx.boxed(arque_driver))
+}
+
+pub fn js_driver_insert_event<'c>(mut cx: FunctionContext<'c>) -> JsResult<JsPromise> {
+    let arque_driver = cx.argument::<JsBox<ArqueDriver>>(0)?;
+
+    let event_object = cx.argument::<JsObject>(1)?;
+
+    let (deffered, promise) = cx.promise();
+
+    arque_driver
+        .insert_event(cx, deffered, event_object)
+        .unwrap();
+
+    Ok(promise)
 }
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
-    cx.export_function("driverNew", ArqueDriver::js_new)
-        .unwrap();
-    cx.export_function("insertEvent", ArqueDriver::js_insert_event)
-        .unwrap();
+    cx.export_function("driverNew", js_driver_new)?;
+    cx.export_function("insertEvent", js_driver_insert_event)?;
     Ok(())
 }
