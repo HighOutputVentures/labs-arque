@@ -19,12 +19,4 @@ impl Store for MockRocksDBStore {
         println!("list_aggregate_events");
         Ok(vec![])
     }
-
-    fn list_aggregate_events_next<'a>(
-        &self,
-        _params: &ListAggregateEventsParamsNext,
-    ) -> Result<Vec<Event<'a>>, ListAggregateEventsError> {
-        println!("list_aggregate_events_next");
-        Ok(vec![])
-    }
 }

@@ -1,4 +1,3 @@
-use arque_common::event_generated::Event;
 use custom_error::custom_error;
 use rocksdb::{Error};
 
@@ -36,8 +35,4 @@ pub trait Store {
         &self,
         params: ListAggregateEventsParams,
     ) -> Result<Vec<Vec<u8>>, Error>;
-    fn list_aggregate_events_next<'a>(
-        &self,
-        params: &ListAggregateEventsParamsNext,
-    ) -> Result<Vec<Event<'a>>, ListAggregateEventsError>;
 }
