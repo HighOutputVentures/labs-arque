@@ -30,7 +30,7 @@ impl<'a> Event<'a> {
   pub const VT_AGGREGATE_ID: flatbuffers::VOffsetT = 8;
   pub const VT_AGGREGATE_VERSION: flatbuffers::VOffsetT = 10;
   pub const VT_BODY: flatbuffers::VOffsetT = 12;
-  pub const VT_METADATA: flatbuffers::VOffsetT = 14;
+  pub const VT_META: flatbuffers::VOffsetT = 14;
 
   #[inline]
   pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -42,7 +42,7 @@ impl<'a> Event<'a> {
     args: &'args EventArgs<'args>
   ) -> flatbuffers::WIPOffset<Event<'bldr>> {
     let mut builder = EventBuilder::new(_fbb);
-    if let Some(x) = args.metadata { builder.add_metadata(x); }
+    if let Some(x) = args.meta { builder.add_meta(x); }
     if let Some(x) = args.body { builder.add_body(x); }
     builder.add_aggregate_version(args.aggregate_version);
     if let Some(x) = args.aggregate_id { builder.add_aggregate_id(x); }
@@ -73,8 +73,8 @@ impl<'a> Event<'a> {
     self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(Event::VT_BODY, None).map(|v| v.safe_slice())
   }
   #[inline]
-  pub fn metadata(&self) -> Option<&'a [u8]> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(Event::VT_METADATA, None).map(|v| v.safe_slice())
+  pub fn meta(&self) -> Option<&'a [u8]> {
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(Event::VT_META, None).map(|v| v.safe_slice())
   }
 }
 
@@ -90,7 +90,7 @@ impl flatbuffers::Verifiable for Event<'_> {
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("aggregate_id", Self::VT_AGGREGATE_ID, false)?
      .visit_field::<u32>("aggregate_version", Self::VT_AGGREGATE_VERSION, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("body", Self::VT_BODY, false)?
-     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("metadata", Self::VT_METADATA, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("meta", Self::VT_META, false)?
      .finish();
     Ok(())
   }
@@ -101,7 +101,7 @@ pub struct EventArgs<'a> {
     pub aggregate_id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub aggregate_version: u32,
     pub body: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
-    pub metadata: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub meta: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
 }
 impl<'a> Default for EventArgs<'a> {
   #[inline]
@@ -112,7 +112,7 @@ impl<'a> Default for EventArgs<'a> {
       aggregate_id: None,
       aggregate_version: 0,
       body: None,
-      metadata: None,
+      meta: None,
     }
   }
 }
@@ -143,8 +143,8 @@ impl<'a: 'b, 'b> EventBuilder<'a, 'b> {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Event::VT_BODY, body);
   }
   #[inline]
-  pub fn add_metadata(&mut self, metadata: flatbuffers::WIPOffset<flatbuffers::Vector<'b , u8>>) {
-    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Event::VT_METADATA, metadata);
+  pub fn add_meta(&mut self, meta: flatbuffers::WIPOffset<flatbuffers::Vector<'b , u8>>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Event::VT_META, meta);
   }
   #[inline]
   pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> EventBuilder<'a, 'b> {
@@ -169,7 +169,7 @@ impl core::fmt::Debug for Event<'_> {
       ds.field("aggregate_id", &self.aggregate_id());
       ds.field("aggregate_version", &self.aggregate_version());
       ds.field("body", &self.body());
-      ds.field("metadata", &self.metadata());
+      ds.field("meta", &self.meta());
       ds.finish()
   }
 }
