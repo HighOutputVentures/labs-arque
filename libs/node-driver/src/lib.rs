@@ -4,7 +4,10 @@ use arque_common::request_generated::{Event, EventArgs};
 use arque_driver::Driver;
 use casual_logger::Log;
 use flatbuffers::FlatBufferBuilder;
-use neon::{prelude::*, types::Deferred};
+use neon::{
+    prelude::*,
+    types::{buffer::TypedArray, Deferred},
+};
 use once_cell::sync::OnceCell;
 use tokio::{runtime::Runtime, sync::Mutex};
 
@@ -20,6 +23,7 @@ fn vec_to_js_array<'b>(v: &[u8], cx: &mut FunctionContext<'b>) -> JsResult<'b, J
     Ok(arr)
 }
 
+#[allow(dead_code)]
 fn js_array_to_vec<'a, C>(js_array: Handle<'a, JsArray>, cx: &mut C) -> Vec<u8>
 where
     C: Context<'a>,
@@ -35,6 +39,19 @@ where
     }
 
     vecx
+}
+
+#[allow(dead_code)]
+fn js_buffer_to_vec<'a, C>(js_buffer: Handle<'a, JsBuffer>, cx: &mut C) -> Vec<u8>
+where
+    C: Context<'a>,
+{
+    let mut buf_vec: Vec<u8> = Vec::new();
+    for (_, item) in js_buffer.as_slice(cx).iter().enumerate() {
+        buf_vec.push(*item);
+    }
+
+    buf_vec
 }
 
 #[allow(dead_code)]
@@ -95,20 +112,20 @@ impl ArqueDriver {
         let channel = cx.channel();
         let driver_context = Arc::clone(&self.driver);
 
-        let js_id: Handle<JsArray> = event_object.get(&mut cx, "id").unwrap();
+        let js_id: Handle<JsBuffer> = event_object.get(&mut cx, "id").unwrap();
         let js_type_: Handle<JsNumber> = event_object.get(&mut cx, "type_").unwrap();
-        let js_aggregate_id: Handle<JsArray> = event_object.get(&mut cx, "aggregateId").unwrap();
+        let js_aggregate_id: Handle<JsBuffer> = event_object.get(&mut cx, "aggregateId").unwrap();
         let js_aggregate_version: Handle<JsNumber> =
             event_object.get(&mut cx, "aggregateVersion").unwrap();
-        let js_body: Handle<JsArray> = event_object.get(&mut cx, "body").unwrap();
-        let js_meta: Handle<JsArray> = event_object.get(&mut cx, "meta").unwrap();
+        let js_body: Handle<JsBuffer> = event_object.get(&mut cx, "body").unwrap();
+        let js_meta: Handle<JsBuffer> = event_object.get(&mut cx, "meta").unwrap();
 
-        let rust_id = js_array_to_vec(js_id, &mut cx);
+        let rust_id = js_buffer_to_vec(js_id, &mut cx);
         let rust_type_ = js_type_.value(&mut cx) as u16;
-        let rust_aggregate_id = js_array_to_vec(js_aggregate_id, &mut cx);
+        let rust_aggregate_id = js_buffer_to_vec(js_aggregate_id, &mut cx);
         let rust_aggregate_version = js_aggregate_version.value(&mut cx) as u32;
-        let rust_body = js_array_to_vec(js_body, &mut cx);
-        let rust_meta = js_array_to_vec(js_meta, &mut cx);
+        let rust_body = js_buffer_to_vec(js_body, &mut cx);
+        let rust_meta = js_buffer_to_vec(js_meta, &mut cx);
 
         let idxx = rust_id.clone();
 
