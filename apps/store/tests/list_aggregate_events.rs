@@ -33,7 +33,7 @@ async fn test_list_aggregate_events() {
         id: Some(random_bytes(12)),
         type_: Some(fastrand::u16(..)),
         aggregate_id: Some(random_bytes(12)),
-        aggregate_version: Some(fastrand::u32(..)),
+        aggregate_version: Some(1u32),
         body: Some(random_bytes(1024)),
         meta: Some(random_bytes(64)),
     };
