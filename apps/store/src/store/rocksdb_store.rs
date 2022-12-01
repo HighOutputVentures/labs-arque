@@ -1,6 +1,5 @@
 use super::{InsertEventError, InsertEventParams, ListAggregateEventsParams, Store};
 use super::store::{ListAggregateEventsError, ListAggregateEventsParamsNext};
-use arque_common::event_generated::{root_as_event, Event};
 use byteorder::{BigEndian, ByteOrder};
 use rocksdb::{Error, WriteBatch, DB, DBPinnableSlice};
 use rocksdb::Options;

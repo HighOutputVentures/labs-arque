@@ -2,6 +2,7 @@ mod controllers;
 mod server;
 mod store;
 mod stream;
+mod store_next;
 
 use std::error::Error;
 use std::sync::mpsc::channel;
