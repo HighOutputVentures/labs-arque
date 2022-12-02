@@ -4,7 +4,7 @@ import { ObjectId } from './object-id';
 
 export type EventHandler<TState> = {
   type: number;
-  apply(state: TState, event: Event): TState | Promise<TState>;
+  handle(state: TState, event: Event): TState | Promise<TState>;
 }
 
 type GeneratedEvent<TEvent extends Event> = Pick<TEvent, 'type' | 'body'>;
@@ -29,6 +29,7 @@ export type AggregateOptions<
 > = {
   eventHandlers: EventHandler<TState>[];
   commandHandlers: CommandHandler<TCommand, TEvent, TState>[];
+  preProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>;
 }
 
 export class AggregateInstance<
@@ -50,6 +51,10 @@ export class AggregateInstance<
   }
 
   public async process(command: TCommand): Promise<void> {
+    throw new Error('not implemented');
+  }
+
+  public async reload(): Promise<void> {
     throw new Error('not implemented');
   }
 }

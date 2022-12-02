@@ -87,7 +87,7 @@ async function main() {
     eventHandlers: [
       {
         type: EventType.AccountCreated,
-        apply(_, event: AccountCreatedEvent) {
+        handle(_, event: AccountCreatedEvent) {
           return {
             account: {
               id: event.aggregate.id,
@@ -101,7 +101,7 @@ async function main() {
       },
       {
         type: EventType.AccountUpdated,
-        apply(state, event: AccountUpdatedEvent) {
+        handle(state, event: AccountUpdatedEvent) {
           return {
             account: {
               ...state.account,

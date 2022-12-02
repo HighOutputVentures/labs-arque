@@ -10,4 +10,8 @@ export class ObjectId {
   public toString(): string {
     throw new Error('not implemented');
   }
+
+  public equals(other: ObjectId): boolean {
+    return this.toBuffer().equals(other.toBuffer());
+  }
 }
