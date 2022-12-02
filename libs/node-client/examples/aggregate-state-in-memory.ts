@@ -3,15 +3,17 @@ import { Command } from '../src/command';
 import { Event } from '../src/event';
 import { ObjectId } from '../src/object-id';
 
+type Account = {
+  id: ObjectId;
+  name: string;
+  password: string;
+  metadata?: Record<string, unknown>;
+  dateTimeCreated: Date;
+  dateTimeLastUpdated: Date;
+};
+
 type AccountAggregateState = {
-  account: {
-    id: ObjectId;
-    name: string;
-    password: string;
-    metadata?: Record<string, unknown>;
-    dateTimeCreated: Date;
-    dateTimeLastUpdated: Date;
-  }
+  root: Account,
 }
 
 enum CommandType {
@@ -21,12 +23,12 @@ enum CommandType {
 
 type CreateAccountCommand = Command<
   CommandType.CreateAccount,
-  Pick<AccountAggregateState['account'], 'name' | 'password' | 'metadata'>
+  Pick<Account, 'name' | 'password' | 'metadata'>
 >;
 
 type UpdateAccountCommand = Command<
   CommandType.UpdateAccount,
-  Partial<Pick<AccountAggregateState['account'], 'password' | 'metadata'>>
+  Partial<Pick<Account, 'password' | 'metadata'>>
 >;
 
 type AccountAggregateCommand = CreateAccountCommand | UpdateAccountCommand;
@@ -38,12 +40,12 @@ enum EventType {
 
 type AccountCreatedEvent = Event<
   EventType.AccountCreated,
-  Pick<AccountAggregateState['account'], 'name' | 'password' | 'metadata'>
+  Pick<Account, 'name' | 'password' | 'metadata'>
 >;
 
 type AccountUpdatedEvent = Event<
   EventType.AccountUpdated,
-  Partial<Pick<AccountAggregateState['account'], 'password' | 'metadata'>>
+  Partial<Pick<Account, 'password' | 'metadata'>>
 >;
 
 type AccountAggregateEvent = AccountCreatedEvent | AccountUpdatedEvent;
@@ -89,7 +91,7 @@ async function main() {
         type: EventType.AccountCreated,
         handle(_, event: AccountCreatedEvent) {
           return {
-            account: {
+            root: {
               id: event.aggregate.id,
               name: event.body.name,
               password: event.body.password,
@@ -103,8 +105,8 @@ async function main() {
         type: EventType.AccountUpdated,
         handle(state, event: AccountUpdatedEvent) {
           return {
-            account: {
-              ...state.account,
+            root: {
+              ...state.root,
               ...event.body,
               dateTimeLastUpdated: event.timestamp,
             }
