@@ -2,8 +2,8 @@ import { ObjectId } from './object-id';
 
 export type Event<
   TType extends number = number,
-  TBody extends Record<string, any> = Record<string, any>,
-  TMeta extends Record<string, any> = Record<string, any>,
+  TBody extends {} = {},
+  TMeta extends {} = {},
 > = {
   id: ObjectId;
   type: TType;
