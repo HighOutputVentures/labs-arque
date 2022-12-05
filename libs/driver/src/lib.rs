@@ -14,7 +14,7 @@ use arque_common::{
 
 use custom_error::custom_error;
 use flatbuffers::FlatBufferBuilder;
-use types::ListAggregateEventsParams;
+pub use types::ListAggregateEventsParams;
 
 custom_error! {
     pub InsertEventError
@@ -115,14 +115,14 @@ impl Driver {
 
     pub async fn list_aggregate_events<'a>(
         &mut self,
-        list_aggregate_events_params: ListAggregateEventsParams<'a>,
+        list_aggregate_events_params: ListAggregateEventsParams,
         buffer: &'a mut Vec<u8>,
     ) -> Result<Vec<arque_common::event_generated::Event<'a>>, ListAggregateEventsError> {
         let client = self.get_client().await;
 
         let mut fbb = FlatBufferBuilder::new();
         let list_aggregate_events_request_body_args = ListAggregateEventsRequestBodyArgs {
-            aggregate_id: Some(fbb.create_vector(list_aggregate_events_params.aggregate_id)),
+            aggregate_id: Some(fbb.create_vector(&list_aggregate_events_params.aggregate_id)),
             aggregate_version: list_aggregate_events_params.aggregate_version.unwrap(),
             limit: list_aggregate_events_params.limit,
         };
@@ -283,7 +283,8 @@ mod tests {
 
         let event_data = fbb.finished_data();
 
-        let event_object = flatbuffers::root::<arque_common::event_generated::Event>(event_data).unwrap();
+        let event_object =
+            flatbuffers::root::<arque_common::event_generated::Event>(event_data).unwrap();
 
         let response_status = driver.insert_event(event_object).await.unwrap();
 
@@ -359,7 +360,7 @@ mod tests {
         let mut driver = Driver::new(client_endpoint);
 
         let list_aggregate_events_params = ListAggregateEventsParams {
-            aggregate_id: &aggregate_id,
+            aggregate_id,
             aggregate_version: Some(1u32),
             limit: 1u32,
         };

@@ -1,7 +1,10 @@
-use std::sync::Arc;
+use std::{
+    cell::RefCell,
+    sync::{Arc, MutexGuard},
+};
 
-use arque_common::request_generated::{Event, EventArgs};
-use arque_driver::Driver;
+use arque_common::event_generated::{Event, EventArgs};
+use arque_driver::{Driver, ListAggregateEventsError, ListAggregateEventsParams};
 use casual_logger::Log;
 use flatbuffers::FlatBufferBuilder;
 use neon::{
@@ -168,6 +171,69 @@ impl ArqueDriver {
 
         Ok(cx.undefined())
     }
+
+    pub fn list_aggregate_events<'a, C: Context<'a>>(
+        &'a self,
+        mut cx: C,
+        deffered: Deferred,
+        list_aggregate_events_params: Handle<'a, JsObject>,
+    ) -> JsResult<JsUndefined> {
+        let runtime = runtime(&mut cx).unwrap();
+        let channel = cx.channel();
+        let driver_context = Arc::clone(&self.driver);
+
+        let js_aggregate_id: Handle<JsBuffer> = list_aggregate_events_params
+            .get(&mut cx, "aggregateId")
+            .unwrap();
+        let js_aggregate_version: Handle<JsNumber> = list_aggregate_events_params
+            .get(&mut cx, "aggregateVersion")
+            .unwrap();
+        let js_limit: Handle<JsNumber> =
+            list_aggregate_events_params.get(&mut cx, "limit").unwrap();
+
+        let rust_aggregate_id = js_buffer_to_vec(js_aggregate_id, &mut cx);
+        let rust_aggregate_version = js_aggregate_version.value(&mut cx) as u32;
+        let rust_limit = js_limit.value(&mut cx) as u32;
+
+        runtime.spawn(async move {
+            let mut driver = driver_context.lock().await;
+
+            let list_aggregate_events_params = ListAggregateEventsParams {
+                aggregate_id: rust_aggregate_id,
+                aggregate_version: Some(rust_aggregate_version),
+                limit: rust_limit,
+            };
+
+            static mut BUFFER: Vec<u8> = Vec::new();
+
+            let result = unsafe {
+                driver
+                    .list_aggregate_events(list_aggregate_events_params, &mut BUFFER)
+                    .await
+            };
+
+            deffered.settle_with(&channel, move |mut cx| {
+                //Convert a `reqwest::Error` to a JavaScript exception
+                let response_data = result.or_else(|err| cx.throw_error(err.to_string()))?;
+
+                let array: Handle<JsArray> = JsArray::new(&mut cx, response_data.len() as u32);
+                for(i, data) in response_data.iter().enumerate() {
+                    let js_object = JsObject::new(&mut cx);
+
+                    let js_id_buffer =  JsBuffer::external(&mut cx, data.id().unwrap().to_vec());
+                    js_object.set(&mut cx, "id",  js_id_buffer).unwrap();
+
+                    array.set(&mut cx, i as u32, js_object).unwrap();
+                   
+                }
+
+
+                Ok(cx.number(0u32))
+            });
+        });
+
+        Ok(cx.undefined())
+    }
 }
 
 pub fn js_driver_new(mut cx: FunctionContext) -> JsResult<JsBox<ArqueDriver>> {
@@ -191,6 +257,20 @@ pub fn js_driver_insert_event<'c>(mut cx: FunctionContext<'c>) -> JsResult<JsPro
 
     Ok(promise)
 }
+
+// pub fn js_driver_list_aggregate_events<'c>(mut cx: FunctionContext<'c>) -> JsResult<JsPromise> {
+//     let arque_driver = cx.argument::<JsBox<ArqueDriver>>(0)?;
+
+//     let event_object = cx.argument::<JsObject>(1)?;
+
+//     let (deffered, promise) = cx.promise();
+
+//     arque_driver
+//         .list_aggregate_events(cx, deffered, event_object)
+//         .unwrap();
+
+//     Ok(promise)
+// }
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {

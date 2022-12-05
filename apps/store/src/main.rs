@@ -4,9 +4,10 @@ mod store;
 mod stream;
 mod store_next;
 
+use server::{Server, ServerConfig};
 use std::error::Error;
 use std::sync::mpsc::channel;
-// use server::Server;
+use tempdir::TempDir;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -21,6 +22,21 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     //   vec![]
     // }, rx)?;
+ 
+    let server_endpoint = String::from("tcp://*:4000");
+    let server_temp = server_endpoint.clone();
+    let temp_dir = TempDir::new("arque_test").unwrap();
+   
+    let server = Server::new(ServerConfig {
+        data_path: Some(temp_dir.path()),
+    });
+
+    println!("path: {:?}", temp_dir.path());
+    println!("server started @ {:?}", server_temp);
+
+    server.serve(server_endpoint, _rx).unwrap();
+
+  
 
     Ok(())
 }
