@@ -1,6 +1,6 @@
-import { Arque } from '../src/arque';
-import { Command } from '../src/command';
 import { ObjectId } from '../src/object-id';
+import { Command } from '../src/command';
+import { Arque } from '../src/arque';
 import { Event } from '../src/event';
 import R from 'ramda';
 

@@ -138,6 +138,10 @@ async function main() {
     }
   });
 
+  await aggregate.reload();
+
+  console.log(aggregate.state);
+
   await arque.disconnect();
 }
 
