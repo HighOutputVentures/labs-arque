@@ -10,5 +10,9 @@
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^18.11.9"
+  },
+  "dependencies": {
+    "@types/ramda": "^0.28.20",
+    "ramda": "^0.28.0"
   }
 }

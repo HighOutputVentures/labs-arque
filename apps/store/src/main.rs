@@ -2,6 +2,7 @@ mod controllers;
 mod server;
 mod store;
 mod stream;
+mod store_next;
 
 use server::{Server, ServerConfig};
 use std::error::Error;

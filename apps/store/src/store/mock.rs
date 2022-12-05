@@ -1,6 +1,7 @@
-use rocksdb::Error;
-
+use arque_common::event_generated::Event;
+use rocksdb::{Error};
 use super::Store;
+use super::store::{ListAggregateEventsParamsNext, ListAggregateEventsError};
 use super::{InsertEventError, InsertEventParams, ListAggregateEventsParams};
 
 pub struct MockRocksDBStore;

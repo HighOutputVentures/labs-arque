@@ -1,7 +1,8 @@
 use super::{InsertEventError, InsertEventParams, ListAggregateEventsParams, Store};
+use super::store::{ListAggregateEventsError, ListAggregateEventsParamsNext};
 use byteorder::{BigEndian, ByteOrder};
+use rocksdb::{Error, WriteBatch, DB, DBPinnableSlice};
 use rocksdb::Options;
-use rocksdb::{Error, WriteBatch, DB};
 use std::path::Path;
 
 pub struct RocksDBStore {
@@ -10,17 +11,65 @@ pub struct RocksDBStore {
 
 impl RocksDBStore {
     pub fn open(path: &Path) -> Result<RocksDBStore, Error> {
-        let mut db_opts = Options::default();
-        db_opts.create_missing_column_families(true);
-        db_opts.create_if_missing(true);
+        let mut opts = Options::default();
+        opts.create_missing_column_families(true);
+        opts.create_if_missing(true);
 
         let db = DB::open_cf(
-            &db_opts,
+            &opts,
             path,
-            vec!["events", "aggregate_events", "aggregate_version"],
+            vec!["events", "aggregate_events", "aggregate_versions"],
         )?;
 
         Ok(RocksDBStore { db })
+    }
+
+    fn list_aggregate_events_next(
+        &self,
+        params: &ListAggregateEventsParamsNext,
+    ) -> Result<Vec<DBPinnableSlice>, ListAggregateEventsError> {
+        let cf1 = match self.db.cf_handle("events") {
+            Some(cf) => cf,
+            None => return Err(ListAggregateEventsError::Unexpected { message: "`events` column family should exist".to_string() }),
+        };
+
+        let cf2 = match self.db.cf_handle("aggregate_events") {
+            Some(cf) => cf,
+            None => return Err(ListAggregateEventsError::Unexpected { message: "`aggregate_events` column family should exist".to_string() }),
+        };
+
+        let aggregate_version = params.aggregate_version.unwrap_or(0);
+
+        let anchor = [
+            params.aggregate_id,
+            &aggregate_version.to_be_bytes(),
+        ].concat();
+
+        let ids = self
+            .db
+            .iterator_cf(cf2, rocksdb::IteratorMode::From(anchor.as_slice(), rocksdb::Direction::Forward))
+            .take(params.limit.unwrap_or(100))
+            .take_while(|item| match item {
+                Ok((key, _)) => key.starts_with(params.aggregate_id),
+                Err(_) => false,
+            })
+            .filter_map(|item| match item {
+                Ok((_, value)) => Some(value),
+                Err(_) => None,
+            })
+            .collect::<Vec<_>>();
+
+        let events = self
+            .db
+            .batched_multi_get_cf(cf1, ids, true)
+            .into_iter()
+            .filter_map(|item| match item {
+                Ok(value) => value,
+                _ => None,
+            })
+            .collect::<Vec<DBPinnableSlice>>();
+
+        Ok(events)
     }
 }
 
@@ -36,7 +85,7 @@ impl Store for RocksDBStore {
             None => return Err(InsertEventError::Unexpected { message: "`aggregate_events` column family should exist".to_string() }),
         };
 
-        let cf3 = match self.db.cf_handle("aggregate_version") {
+        let cf3 = match self.db.cf_handle("aggregate_versions") {
             Some(cf) => cf,
             None => return Err(InsertEventError::Unexpected { message: "`aggregate_version` column family should exist".to_string() }),
         };
