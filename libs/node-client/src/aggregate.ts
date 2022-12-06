@@ -2,9 +2,9 @@ import { Command } from './command';
 import { Event } from './event';
 import { ObjectId } from './object-id';
 
-export type EventHandler<TState> = {
+export type EventHandler<TState, TContext extends {}> = {
   type: number;
-  handle(state: TState, event: Event): TState | Promise<TState>;
+  handle(ctx: TContext & { state: TState }, event: Event): TState | Promise<TState>;
 }
 
 type GeneratedEvent<TEvent extends Event> = Pick<TEvent, 'type' | 'body'>;
@@ -13,9 +13,10 @@ export type CommandHandler<
   TCommand extends Command,
   TEvent extends Event,
   TState,
+  TContext extends {}
 > = {
   type: number;
-  handle(state: TState, command: TCommand):
+  handle(ctx: TContext & { state: TState }, command: TCommand):
     GeneratedEvent<TEvent> |
     GeneratedEvent<TEvent>[] |
     Promise<GeneratedEvent<TEvent>> |
@@ -26,10 +27,12 @@ export type AggregateOptions<
   TCommand extends Command,
   TEvent extends Event,
   TState,
+  TContext extends {}
 > = {
-  eventHandlers: EventHandler<TState>[];
-  commandHandlers: CommandHandler<TCommand, TEvent, TState>[];
+  eventHandlers: EventHandler<TState, TContext>[];
+  commandHandlers: CommandHandler<TCommand, TEvent, TState, TContext>[];
   preProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>;
+  postProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>;
 }
 
 export class AggregateInstance<
@@ -62,9 +65,10 @@ export class AggregateInstance<
 export class Aggregate<
   TCommand extends Command,
   TEvent extends Event,
-  TState
+  TState,
+  TContext extends {}
 > {
-  constructor(opts: AggregateOptions<TCommand, TEvent, TState>) {
+  constructor(opts: AggregateOptions<TCommand, TEvent, TState, TContext>) {
     throw new Error('not implemented');
   }
 

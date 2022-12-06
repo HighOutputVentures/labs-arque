@@ -65,14 +65,14 @@ async function main() {
     commandHandlers: [
       {
         type: CommandType.CreateAccount,
-        handle(state, command: CreateAccountCommand) {
-          if (state) {
+        handle(ctx, command: CreateAccountCommand) {
+          if (ctx.state) {
             throw new Error('account already exists');
           }
 
           return {
             type: EventType.AccountCreated,
-            body: command.parameters
+            body: command.params
           };
         },
       },
@@ -81,7 +81,7 @@ async function main() {
         handle(_, command: UpdateAccountCommand) {
           return {
             type: EventType.AccountUpdated,
-            body: command.parameters
+            body: command.params
           }
         },
       }
@@ -103,10 +103,10 @@ async function main() {
       },
       {
         type: EventType.AccountUpdated,
-        handle(state, event: AccountUpdatedEvent) {
+        handle(ctx, event: AccountUpdatedEvent) {
           return {
             root: {
-              ...state.root,
+              ...ctx.state.root,
               ...event.body,
               dateTimeLastUpdated: event.timestamp,
             }
@@ -122,7 +122,7 @@ async function main() {
 
   await aggregate.process({
     type: CommandType.CreateAccount,
-    parameters: {
+    params: {
       name: 'user',
       password: 'password',
       metadata: {
@@ -133,10 +133,14 @@ async function main() {
 
   await aggregate.process({
     type: CommandType.UpdateAccount,
-    parameters: {
+    params: {
       password: 'password1',
     }
   });
+
+  await aggregate.reload();
+
+  console.log(aggregate.state);
 
   await arque.disconnect();
 }
