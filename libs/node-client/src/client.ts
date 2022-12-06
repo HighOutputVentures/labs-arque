@@ -24,7 +24,6 @@ export type ClientOptions = {
 @injectable()
 export class Client {
   constructor (@inject(TYPE.ClientOptions) opts: ClientOptions) {
-
   }
 
   public async connect() {

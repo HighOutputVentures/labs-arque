@@ -2,7 +2,7 @@ import { ObjectId } from '../src/object-id';
 import { Command } from '../src/command';
 import { Arque } from '../src/arque';
 import { Event } from '../src/event';
-import R from 'ramda';
+import * as R from 'ramda';
 
 type KanbanBoard = {
   id: ObjectId;
@@ -95,7 +95,7 @@ async function main() {
 
           return {
             type: EventType.KanbanBoardCreated,
-            body: command.parameters
+            body: command.params
           };
         },
       },
@@ -108,7 +108,7 @@ async function main() {
 
           return {
             type: EventType.KanbanBoardColumnCreated,
-            body: command.parameters
+            body: command.params
           };
         },
       }
