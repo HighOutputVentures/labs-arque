@@ -1,7 +1,7 @@
 export type Command<
   TType extends number = number,
-  TParameters extends {} = {},
+  TParams extends {} = {},
 > = {
   type: TType;
-  parameters: TParameters;
+  params: TParams;
 }

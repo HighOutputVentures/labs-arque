@@ -88,8 +88,8 @@ async function main() {
     commandHandlers: [
       {
         type: CommandType.CreateKanbanBoard,
-        handle(state, command: CreateKanbanBoardCommand) {
-          if (state) {
+        handle(ctx, command: CreateKanbanBoardCommand) {
+          if (ctx.state) {
             throw new Error('Kanban board already exists');
           }
 
@@ -101,8 +101,8 @@ async function main() {
       },
       {
         type: CommandType.CreateKanbanBoardColumn,
-        handle(state, command: CreateKanbanBoardColumnCommand) {
-          if (state.columns.length >= 11) {
+        handle(ctx, command: CreateKanbanBoardColumnCommand) {
+          if (ctx.state.columns.length >= 11) {
             throw new Error('can only create up to 12 columns');
           }
 
@@ -134,17 +134,17 @@ async function main() {
       },
       {
         type: EventType.KanbanBoardColumnCreated,
-        handle(state, event: KanbanBoardColumnCreatedEvent) {
-          const column = R.find((item) => item.id.equals(event.body.id), state.columns);
+        handle(ctx, event: KanbanBoardColumnCreatedEvent) {
+          const column = R.find((item) => item.id.equals(event.body.id), ctx.state.columns);
 
           if (column) {
             throw new Error('column already exists');
           }
 
           return {
-            ...state,
+            ...ctx.state,
             columns: [
-              ...state.columns,
+              ...ctx.state.columns,
               {
                 ...event.body,
                 cardCount: 0,

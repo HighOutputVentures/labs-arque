@@ -1,5 +1,7 @@
+import { inject, injectable } from 'inversify';
 import { Event } from './event';
 import { ObjectId } from './object-id';
+import { TYPE } from './type';
 
 export type InsertEventParams<
   TType extends number = number,
@@ -15,7 +17,16 @@ export type ListAggregateEventsParams = {
   limit?: number;
 };
 
+export type ClientOptions = {
+  url?: string;
+}
+
+@injectable()
 export class Client {
+  constructor (@inject(TYPE.ClientOptions) opts: ClientOptions) {
+
+  }
+
   public async connect() {
     throw new Error('not implemented');
   }
@@ -32,7 +43,7 @@ export class Client {
     throw new Error('not implemented');
   }
 
-  public async listAggregateEvents<T extends Event>(_params: ListAggregateEventsParams): Promise<T> {
+  public async listAggregateEvents<TEvent extends Event = Event>(_params: ListAggregateEventsParams): Promise<TEvent[]> {
     throw new Error('not implemented');
   }
 }

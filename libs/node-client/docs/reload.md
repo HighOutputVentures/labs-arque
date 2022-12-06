@@ -1,7 +1,8 @@
 ```mermaid
 flowchart TB
   A(Start) --> B[acquire mutex lock]
-  B --> C{{digest}}
-  C --> D[release mutex lock]
-  D --> E(Stop)
+  B --> C[retrieve new events]
+  C --> D{{digest}}
+  D --> E[release mutex lock]
+  E --> F(Stop)
 ```
