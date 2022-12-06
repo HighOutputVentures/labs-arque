@@ -1,16 +1,21 @@
 import { Client } from './client';
-import { Command } from './command';
+import { Command, CommandHandler } from './command';
+import { Event, EventHandler } from './event';
 import { ObjectId } from './object-id';
 
 export class AggregateInstance<
   TCommand extends Command,
+  TEvent extends Event,
   TState,
+  TContext extends {}
 > {
   constructor(
     private _id: ObjectId,
     private _version: number,
     private _state: TState,
     private client: Client,
+    private commandHandlers: CommandHandler<TCommand, TEvent, TState, TContext>[],
+    private eventHandlers: EventHandler<TState, TContext>[],
   ) {};
 
   get id() {

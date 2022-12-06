@@ -25,7 +25,7 @@ export class Aggregate<
     throw new Error('not implemented');
   }
 
-  public async load(id: ObjectId): Promise<AggregateInstance<TCommand, TState>> {
+  public async load(id: ObjectId): Promise<AggregateInstance<TCommand, TEvent, TState, TContext>> {
     throw new Error('not implemented');
   }
 }
