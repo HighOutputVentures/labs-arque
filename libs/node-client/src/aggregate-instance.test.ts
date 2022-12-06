@@ -9,6 +9,7 @@ describe('AggregateInstance', () => {
   describe('#process', () => {
     test.concurrent.todo('process a command')
     test.concurrent.todo('invalid command')
+    test.concurrent.todo('invalid aggregate version')
     test.concurrent.todo('multiple concurrent execution')
   });
 });
