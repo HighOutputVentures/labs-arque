@@ -116,8 +116,7 @@ impl Driver {
     pub async fn list_aggregate_events<'a>(
         &mut self,
         list_aggregate_events_params: ListAggregateEventsParams,
-        buffer: &'a mut Vec<u8>,
-    ) -> Result<Vec<arque_common::event_generated::Event<'a>>, ListAggregateEventsError> {
+    ) -> Result<Vec<Vec<u8>>, ListAggregateEventsError> {
         let client = self.get_client().await;
 
         let mut fbb = FlatBufferBuilder::new();
@@ -153,11 +152,7 @@ impl Driver {
             }
         };
 
-        for (_, data) in response_data.iter().enumerate() {
-            buffer.push(*data);
-        }
-
-        let response = match root_as_response(buffer) {
+        let response = match root_as_response(&response_data) {
             Ok(data) => data,
             Err(e) => {
                 return Err(ListAggregateEventsError::Unknown {
@@ -169,15 +164,13 @@ impl Driver {
         let list = response.body_as_list_aggregate_events().unwrap();
         let events = list.events().unwrap();
 
-        let mut event_vec: Vec<arque_common::event_generated::Event> = Vec::new();
+        let mut event_vec: Vec<Vec<u8>> = Vec::new();
 
         for (_, event) in events.iter().enumerate() {
-            let event_data = arque_common::event_generated::Event::init_from_table(event._tab.to_owned());
-
-            event_vec.push(event_data);
+            event_vec.push(event._tab.buf.to_vec());
         }
 
-        Ok(event_vec)
+        Ok(event_vec.to_owned())
     }
 }
 
@@ -365,10 +358,8 @@ mod tests {
             limit: 1u32,
         };
 
-        let mut buffer: Vec<u8> = Vec::new();
-
         let events = driver
-            .list_aggregate_events(list_aggregate_events_params, &mut buffer)
+            .list_aggregate_events(list_aggregate_events_params)
             .await
             .unwrap();
 
