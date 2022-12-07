@@ -34,19 +34,20 @@ type AccountUpdatedEvent = Event<
 describe('AggregateInstance', () => {
   describe.only('#reload', () => {
     test.concurrent('update to the latest state', async () => {
-      const id = new ObjectId();
+      const aggregateId = new ObjectId();
+      const accountId = new ObjectId();
 
       const clientMock = {
         listAggregateEvents: jest.fn().mockResolvedValue([
           {
             id: new ObjectId(),
             aggregate: {
-              id,
+              id: aggregateId,
               version: 2,
             },
             type: 1,
             body: {
-              id: new ObjectId(),
+              id: accountId,
               name: 'user',
               password: 'password',
             },
@@ -86,9 +87,19 @@ describe('AggregateInstance', () => {
       ];
 
       let aggregateInstance = new AggregateInstance(
-        id,
+        aggregateId,
         1,
-        { root: {} },
+        {
+          root: {
+            name: 'user',
+            password: 'zero',
+            metadata: {
+              emailAddress: 'user@arque.io',
+            },
+            dateTimeCreated: new Date(),
+            dateTimeLastUpdated: new Date(),
+          },
+        },
         clientMock as never,
         commandHandlers,
         eventHandlers
@@ -96,6 +107,7 @@ describe('AggregateInstance', () => {
 
       await aggregateInstance.reload();
 
+      expect(aggregateInstance.id).toEqual(aggregateId);
       expect(aggregateInstance.version).toEqual(2);
     });
 
