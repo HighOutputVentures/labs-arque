@@ -41,7 +41,7 @@ describe('AggregateInstance', () => {
           {
             id: new ObjectId(),
             aggregate: {
-              id: new ObjectId(),
+              id,
               version: 2,
             },
             type: 1,
