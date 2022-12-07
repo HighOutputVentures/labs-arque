@@ -34,7 +34,7 @@ type AccountUpdatedEvent = Event<
 describe('AggregateInstance', () => {
   describe.only('#reload', () => {
     test.concurrent('update to the latest state', async () => {
-      const id = ObjectId.from('2a65d66ced4b8adf4f1ecd79');
+      const id = new ObjectId();
 
       const clientMock = {
         listAggregateEvents: jest.fn().mockResolvedValue([
