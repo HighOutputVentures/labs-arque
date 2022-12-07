@@ -1,11 +1,8 @@
-import { Container } from 'inversify';
 import { AggregateInstance } from './aggregate-instance';
-import { Client } from './client';
 import { ObjectId } from './object-id';
-import { TYPE } from './type';
 import { Command } from './command';
 import { Event } from './event';
-import 'reflect-metadata';
+
 type Account = {
   id: ObjectId;
   name: string;
@@ -15,43 +12,24 @@ type Account = {
   dateTimeLastUpdated: Date;
 };
 
-type AccountAggregateState = {
-  root: Account;
-};
-
 enum CommandType {
   CreateAccount = 0,
   UpdateAccount = 1,
 }
-
-type CreateAccountCommand = Command<
-  CommandType.CreateAccount,
-  Pick<Account, 'name' | 'password' | 'metadata'>
->;
 
 type UpdateAccountCommand = Command<
   CommandType.UpdateAccount,
   Partial<Pick<Account, 'password' | 'metadata'>>
 >;
 
-type AccountAggregateCommand = CreateAccountCommand | UpdateAccountCommand;
-
 enum EventType {
   AccountCreated = 0,
   AccountUpdated = 1,
 }
-
-type AccountCreatedEvent = Event<
-  EventType.AccountCreated,
-  Pick<Account, 'name' | 'password' | 'metadata'>
->;
-
 type AccountUpdatedEvent = Event<
   EventType.AccountUpdated,
   Partial<Pick<Account, 'password' | 'metadata'>>
 >;
-
-type AccountAggregateEvent = AccountCreatedEvent | AccountUpdatedEvent;
 
 describe('AggregateInstance', () => {
   describe.only('#reload', () => {
