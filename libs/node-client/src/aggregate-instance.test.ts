@@ -107,7 +107,85 @@ describe('AggregateInstance', () => {
     });
 
     // should concurrent
-    test.todo('no events');
+    test.concurrent('no events', async () => {
+      type Account = {
+        id: ObjectId;
+        name: string;
+        password: string;
+        metadata?: Record<string, unknown>;
+        dateTimeCreated: Date;
+        dateTimeLastUpdated: Date;
+      };
+
+      type AccountAggregateState = {
+        root: Account;
+      };
+
+      enum EventType {
+        AccountCreated = 0,
+        AccountUpdated = 1,
+      }
+
+      type AccountUpdatedEvent = Event<
+        EventType.AccountUpdated,
+        Partial<Pick<Account, 'password' | 'metadata'>>
+      >;
+
+      const id = new ObjectId();
+
+      const ClientMock = {
+        listAggregateEvents: jest.fn().mockResolvedValue([]),
+      };
+
+      const eventHandler = {
+        type: EventType.AccountUpdated,
+        handle: jest.fn((ctx, event: AccountUpdatedEvent) => {
+          return {
+            root: {
+              ...ctx.state.root,
+              ...event.body,
+              dateTimeLastUpdated: event.timestamp,
+            },
+          };
+        }),
+      };
+
+      const eventHandlers = [eventHandler];
+      const version = 1;
+      const state = {
+        root: {
+          id,
+          name: faker.name.firstName().toLowerCase(),
+          password: await hash(faker.internet.password(), 10),
+          metadata: {
+            firstName: faker.name.firstName(),
+            lastName: faker.name.lastName(),
+          },
+          dateTimeCreated: new Date(),
+          dateTimeLastUpdated: new Date(),
+        },
+      };
+
+      let aggregate = new AggregateInstance<
+        Command,
+        Event,
+        AccountAggregateState,
+        {}
+      >(id, version, state, ClientMock as never, [], eventHandlers);
+
+      await aggregate.reload();
+
+      expect(ClientMock.listAggregateEvents).toBeCalledTimes(1);
+      expect(
+        ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.id
+      ).toEqual(id);
+      expect(
+        ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.version
+      ).toEqual(version);
+
+      expect(eventHandler.handle).not.toBeCalled();
+    });
+
     test.todo('multiple concurrent execution');
   });
 
