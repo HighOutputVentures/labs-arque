@@ -3,6 +3,8 @@ import { Command, CommandHandler } from './command';
 import { Event, EventHandler } from './event';
 import { ObjectId } from './object-id';
 import { Mutex } from 'async-mutex';
+import assert from 'assert';
+
 export class AggregateInstance<
   TCommand extends Command,
   TEvent extends Event,
@@ -10,6 +12,8 @@ export class AggregateInstance<
   TContext extends {}
 > {
   private mutex: Mutex;
+  private eventHandlers: Map<number, EventHandler<TState, TContext>> = new Map();
+
   constructor(
     private _id: ObjectId,
     private _version: number,
@@ -21,9 +25,13 @@ export class AggregateInstance<
       TState,
       TContext
     >[],
-    private eventHandlers: EventHandler<TState, TContext>[]
+    eventHandlers: EventHandler<TState, TContext>[]
   ) {
     this.mutex = new Mutex();
+
+    for (const eventHandler of eventHandlers) {
+      this.eventHandlers.set(eventHandler.type, eventHandler);
+    }
   }
 
   get id() {
@@ -43,27 +51,32 @@ export class AggregateInstance<
   }
 
   public async reload(): Promise<void> {
-    await this.mutex.runExclusive(async () => {
-      let version = this._version;
-      let id = this._id;
+    const release = await this.mutex.acquire();
 
+    try {
       let events = await this.client.listAggregateEvents({
         aggregate: {
-          id,
-          version,
+          id: this._id,
+          version: this._version,
         },
       });
 
-      events.map((event) => {
-        if (version < event.aggregate.version) {
-          this._id = event.aggregate.id;
-          this._version = event.aggregate.version;
-          this._state['root'] = {
-            ...event.body,
-            metadata: event.meta,
-          };
-        }
-      });
-    });
+      for (const event of events) {
+        const eventHandler = this.eventHandlers.get(event.type);
+
+        assert(eventHandler, `event handler for ${event.type} not found`);
+
+        const state = await eventHandler.handle({ state: this._state} as never, event);
+
+        this._state = state;
+        this._version = event.aggregate.version;
+      }
+
+      release();
+    } catch(err) {
+      release();
+
+      throw err;
+    }
   }
 }

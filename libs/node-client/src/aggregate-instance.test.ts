@@ -2,74 +2,55 @@ import { AggregateInstance } from './aggregate-instance';
 import { ObjectId } from './object-id';
 import { Command } from './command';
 import { Event } from './event';
-
-type Account = {
-  id: ObjectId;
-  name: string;
-  password: string;
-  metadata?: Record<string, unknown>;
-  dateTimeCreated: Date;
-  dateTimeLastUpdated: Date;
-};
-
-enum CommandType {
-  CreateAccount = 0,
-  UpdateAccount = 1,
-}
-
-type UpdateAccountCommand = Command<
-  CommandType.UpdateAccount,
-  Partial<Pick<Account, 'password' | 'metadata'>>
->;
-
-enum EventType {
-  AccountCreated = 0,
-  AccountUpdated = 1,
-}
-type AccountUpdatedEvent = Event<
-  EventType.AccountUpdated,
-  Partial<Pick<Account, 'password' | 'metadata'>>
->;
+import { faker } from '@faker-js/faker';
+import { hash } from 'bcrypt';
 
 describe('AggregateInstance', () => {
   describe.only('#reload', () => {
     test.concurrent('update to the latest state', async () => {
-      const aggregateId = new ObjectId();
-      const accountId = new ObjectId();
+      type Account = {
+        id: ObjectId;
+        name: string;
+        password: string;
+        metadata?: Record<string, unknown>;
+        dateTimeCreated: Date;
+        dateTimeLastUpdated: Date;
+      };
+      
+      type AccountAggregateState = {
+        root: Account,
+      };
+      
+      enum EventType {
+        AccountCreated = 0,
+        AccountUpdated = 1,
+      };
+      
+      type AccountUpdatedEvent = Event<
+        EventType.AccountUpdated,
+        Partial<Pick<Account, 'password' | 'metadata'>>
+      >;      
 
-      const clientMock = {
+      const id = new ObjectId();
+      const password = await hash(faker.internet.password(), 10);
+
+      const ClientMock = {
         listAggregateEvents: jest.fn().mockResolvedValue([
           {
             id: new ObjectId(),
             aggregate: {
-              id: aggregateId,
+              id,
               version: 2,
             },
-            type: 1,
+            type: EventType.AccountUpdated,
             body: {
-              id: accountId,
-              name: 'user',
-              password: 'password',
+              password,
             },
-            meta: {
-              emailAddress: 'user@arque.io',
-            },
+            meta: {},
             timestamp: new Date(),
           },
         ]),
       };
-
-      const commandHandlers = [
-        {
-          type: CommandType.UpdateAccount,
-          handle(_, command: UpdateAccountCommand) {
-            return {
-              type: EventType.AccountUpdated,
-              body: command.params,
-            };
-          },
-        },
-      ];
 
       const eventHandlers = [
         {
@@ -86,29 +67,31 @@ describe('AggregateInstance', () => {
         },
       ];
 
-      let aggregateInstance = new AggregateInstance(
-        aggregateId,
+      let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
+        id,
         1,
         {
           root: {
-            name: 'user',
-            password: 'zero',
+            id,
+            name: faker.name.firstName().toLowerCase(),
+            password: await hash(faker.internet.password(), 10),
             metadata: {
-              emailAddress: 'user@arque.io',
+              firstName: faker.name.firstName(),
+              lastName: faker.name.lastName(),
             },
             dateTimeCreated: new Date(),
             dateTimeLastUpdated: new Date(),
-          },
+          }
         },
-        clientMock as never,
-        commandHandlers,
+        ClientMock as never,
+        [],
         eventHandlers
       );
 
-      await aggregateInstance.reload();
+      await aggregate.reload();
 
-      expect(aggregateInstance.id).toEqual(aggregateId);
-      expect(aggregateInstance.version).toEqual(2);
+      expect(aggregate.version).toEqual(2);
+      expect(aggregate.state.root.password).toEqual(password);
     });
 
     // should concurrent
