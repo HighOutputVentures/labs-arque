@@ -8,7 +8,7 @@ export type Command<
   params: TParams;
 }
 
-type GeneratedEvent<TEvent extends Event> = Pick<TEvent, 'type' | 'body'>;
+export type GeneratedEvent<TEvent extends Event> = Pick<TEvent, 'type' | 'body'>;
 
 export type CommandHandler<
   TCommand extends Command,
