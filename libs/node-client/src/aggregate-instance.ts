@@ -4,7 +4,8 @@ import { Event, EventHandler } from './event';
 import { ObjectId } from './object-id';
 import { Mutex } from 'async-mutex';
 import assert from 'assert';
-import backoff from 'backoff';
+import backoff, { Backoff } from 'backoff';
+import { InvalidAggregateVersionError } from './error';
 
 export class AggregateInstance<
   TCommand extends Command,
@@ -15,6 +16,8 @@ export class AggregateInstance<
   private mutex: Mutex;
   private eventHandlers: Map<number, EventHandler<TState, TContext>> =
     new Map();
+
+  private backoff: Backoff;
 
   private commandHandlers: Map<
     number,
@@ -38,6 +41,14 @@ export class AggregateInstance<
     for (const eventHandler of eventHandlers) {
       this.eventHandlers.set(eventHandler.type, eventHandler);
     }
+
+    this.backoff = backoff.fibonacci({
+      randomisationFactor: 0,
+      initialDelay: 10,
+      maxDelay: 300,
+    });
+
+    this.backoff.failAfter(10);
   }
 
   get id() {
@@ -53,6 +64,26 @@ export class AggregateInstance<
   }
 
   public async process(command: TCommand): Promise<void> {
+    const context = this;
+    this.backoff.on('ready', async function () {
+      try {
+        await context.processCommand(command);
+      } catch (err) {
+        if (err instanceof InvalidAggregateVersionError)
+          context.backoff.backoff();
+      }
+    });
+
+    try {
+      await this.processCommand(command);
+    } catch (err) {
+      if (err instanceof InvalidAggregateVersionError)
+        context.backoff.backoff();
+
+      throw err;
+    }
+  }
+  private async processCommand(command: TCommand): Promise<void> {
     const release = await this.mutex.acquire();
 
     try {
@@ -97,8 +128,6 @@ export class AggregateInstance<
       release();
     } catch (err) {
       release();
-
-
 
       throw err;
     }
