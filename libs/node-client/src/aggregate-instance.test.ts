@@ -5,6 +5,7 @@ import { Event } from './event';
 import { faker } from '@faker-js/faker';
 import { hash } from 'bcrypt';
 import { toASCII } from 'punycode';
+import { InvalidAggregateVersionError } from './error';
 
 describe('AggregateInstance', () => {
   type Account = {
@@ -348,10 +349,11 @@ describe('AggregateInstance', () => {
       await aggregate.process({
         type: CommandType.CreateAccount,
         params: {
-          name: 'user',
-          password: 'password',
+          name: faker.name.firstName().toLowerCase(),
+          password: await hash(faker.internet.password(), 10),
           metadata: {
-            emailAddress: 'user@arque.io',
+            firstName: faker.name.firstName(),
+            lastName: faker.name.lastName(),
           },
         },
       });
@@ -454,7 +456,76 @@ describe('AggregateInstance', () => {
         })
       ).rejects.toThrow('account already exists');
     });
-    test.todo('invalid aggregate version');
+    test.concurrent('invalid aggregate version', async () => {
+      const id = new ObjectId();
+      const version = 0;
+
+      const ClientMock = {
+        listAggregateEvents: jest.fn().mockResolvedValue([]),
+        insertEvent: jest.fn().mockRejectedValue(
+          new InvalidAggregateVersionError({
+            aggregate: id,
+            currentVersion: version,
+            nextVersion: 1,
+          })
+        ),
+      };
+
+      const eventHandler = {
+        type: EventType.AccountUpdated,
+        handle: jest.fn((ctx, event: AccountUpdatedEvent) => {
+          return {
+            root: {
+              ...ctx.state.root,
+              ...event.body,
+              dateTimeLastUpdated: event.timestamp,
+            },
+          };
+        }),
+      };
+
+      const commandHandler = {
+        type: CommandType.CreateAccount,
+        handle: jest.fn((ctx, command: CreateAccountCommand) => {
+          if (ctx.state) {
+            throw new Error('account already exists');
+          }
+
+          return {
+            type: EventType.AccountCreated,
+            body: command.params,
+          };
+        }),
+      };
+
+      let aggregate = new AggregateInstance<
+        Command,
+        Event,
+        AccountAggregateState,
+        {}
+      >(
+        id,
+        version,
+        null,
+        ClientMock as never,
+        [commandHandler],
+        [eventHandler]
+      );
+
+      expect(
+        aggregate.process({
+          type: CommandType.CreateAccount,
+          params: {
+            name: faker.name.firstName().toLowerCase(),
+            password: await hash(faker.internet.password(), 10),
+            metadata: {
+              firstName: faker.name.firstName(),
+              lastName: faker.name.lastName(),
+            },
+          },
+        })
+      ).rejects.toThrow('invalid aggregate version');
+    });
     test.todo('multiple concurrent execution');
   });
 });
