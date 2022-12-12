@@ -4,6 +4,7 @@ import { Command } from './command';
 import { Event } from './event';
 import { faker } from '@faker-js/faker';
 import { hash } from 'bcrypt';
+import { toASCII } from 'punycode';
 
 describe('AggregateInstance', () => {
   type Account = {
@@ -375,7 +376,84 @@ describe('AggregateInstance', () => {
         CommandType.CreateAccount
       );
     });
-    test.todo('invalid command');
+    test.concurrent('invalid command', async () => {
+      const id = new ObjectId();
+
+      const ClientMock = {
+        listAggregateEvents: jest.fn().mockResolvedValue([]),
+        insertEvent: jest.fn().mockResolvedValue(null),
+      };
+
+      const eventHandler = {
+        type: EventType.AccountUpdated,
+        handle: jest.fn((ctx, event: AccountUpdatedEvent) => {
+          return {
+            root: {
+              ...ctx.state.root,
+              ...event.body,
+              dateTimeLastUpdated: event.timestamp,
+            },
+          };
+        }),
+      };
+
+      const commandHandler = {
+        type: CommandType.CreateAccount,
+        handle: jest.fn((ctx, command: CreateAccountCommand) => {
+          if (ctx.state) {
+            throw new Error('account already exists');
+          }
+
+          return {
+            type: EventType.AccountCreated,
+            body: command.params,
+          };
+        }),
+      };
+
+      const version = 1;
+      const state = {
+        root: {
+          id,
+          name: faker.name.firstName().toLowerCase(),
+          password: await hash(faker.internet.password(), 10),
+          metadata: {
+            firstName: faker.name.firstName(),
+            lastName: faker.name.lastName(),
+          },
+          dateTimeCreated: new Date(),
+          dateTimeLastUpdated: new Date(),
+        },
+      };
+
+      let aggregate = new AggregateInstance<
+        Command,
+        Event,
+        AccountAggregateState,
+        {}
+      >(
+        id,
+        version,
+        state,
+        ClientMock as never,
+        [commandHandler],
+        [eventHandler]
+      );
+
+      expect(
+        aggregate.process({
+          type: CommandType.CreateAccount,
+          params: {
+            name: faker.name.firstName().toLowerCase(),
+            password: await hash(faker.internet.password(), 10),
+            metadata: {
+              firstName: faker.name.firstName(),
+              lastName: faker.name.lastName(),
+            },
+          },
+        })
+      ).rejects.toThrow('account already exists');
+    });
     test.todo('invalid aggregate version');
     test.todo('multiple concurrent execution');
   });
