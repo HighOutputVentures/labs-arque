@@ -17,7 +17,7 @@ export class AggregateInstance<
   private eventHandlers: Map<number, EventHandler<TState, TContext>> =
     new Map();
 
-  private backoff: Backoff;
+  private backoffInstance: Backoff;
 
   private commandHandlers: Map<
     number,
@@ -42,13 +42,13 @@ export class AggregateInstance<
       this.eventHandlers.set(eventHandler.type, eventHandler);
     }
 
-    this.backoff = backoff.fibonacci({
+    this.backoffInstance = backoff.fibonacci({
       randomisationFactor: 0,
       initialDelay: 10,
       maxDelay: 300,
     });
 
-    this.backoff.failAfter(10);
+    this.backoffInstance.failAfter(10);
   }
 
   get id() {
@@ -63,22 +63,42 @@ export class AggregateInstance<
     return this._state;
   }
 
+  private async digest(events: TEvent[]) {
+    for (const event of events) {
+      const eventHandler = this.eventHandlers.get(event.type);
+
+      assert(eventHandler, `event handler for ${event.type} not found`);
+
+      const state = await eventHandler.handle(
+        {
+          state: this._state,
+        } as TContext & { state: TState },
+        event
+      );
+
+      this._state = state;
+      this._version = event.aggregate.version;
+    }
+  }
+
   public async process(command: TCommand): Promise<void> {
     const context = this;
-    this.backoff.on('ready', async function () {
+    this.backoffInstance.on('ready', async function () {
       try {
         await context.processCommand(command);
       } catch (err) {
         if (err instanceof InvalidAggregateVersionError)
-          context.backoff.backoff();
+          context.backoffInstance.backoff();
+
+        throw err;
       }
     });
 
     try {
-      await this.processCommand(command);
+      await context.processCommand(command);
     } catch (err) {
       if (err instanceof InvalidAggregateVersionError)
-        context.backoff.backoff();
+        context.backoffInstance.backoff();
 
       throw err;
     }
@@ -94,21 +114,7 @@ export class AggregateInstance<
         },
       });
 
-      for (const event of events) {
-        const eventHandler = this.eventHandlers.get(event.type);
-
-        assert(eventHandler, `event handler for ${event.type} not found`);
-
-        const state = await eventHandler.handle(
-          {
-            state: this._state,
-          } as TContext & { state: TState },
-          event
-        );
-
-        this._state = state;
-        this._version = event.aggregate.version;
-      }
+      await this.digest(events as TEvent[]);
 
       const commandHandler = this.commandHandlers.get(command.type);
 
@@ -125,16 +131,7 @@ export class AggregateInstance<
 
       if (Array.isArray(generatedEvent)) {
         for await (const event of generatedEvent) {
-          await this.client.insertEvent({
-            ...event,
-            aggregate: {
-              id: this._id,
-              version: this._version + 1,
-            },
-            meta: {},
-          });
-
-          lastEvent = {
+          const eventData = {
             ...event,
             aggregate: {
               id: this._id,
@@ -142,18 +139,12 @@ export class AggregateInstance<
             },
             meta: {},
           };
+          await this.client.insertEvent(eventData);
+
+          lastEvent = eventData;
         }
       } else {
-        await this.client.insertEvent({
-          ...generatedEvent,
-          aggregate: {
-            id: this._id,
-            version: this._version + 1,
-          },
-          meta: {},
-        });
-
-        lastEvent = {
+        const eventData = {
           ...generatedEvent,
           aggregate: {
             id: this._id,
@@ -161,21 +152,12 @@ export class AggregateInstance<
           },
           meta: {},
         };
+        await this.client.insertEvent(eventData);
+
+        lastEvent = eventData;
       }
 
-      const eventHandler = this.eventHandlers.get(lastEvent.type);
-
-      assert(eventHandler, `event handler for ${lastEvent.type} not found`);
-
-      const state = await eventHandler.handle(
-        {
-          state: this._state,
-        } as TContext & { state: TState },
-        lastEvent
-      );
-
-      this._state = state;
-      this._version = lastEvent.aggregate.version;
+      await this.digest([lastEvent]);
 
       release();
     } catch (err) {
@@ -196,19 +178,7 @@ export class AggregateInstance<
         },
       });
 
-      for (const event of events) {
-        const eventHandler = this.eventHandlers.get(event.type);
-
-        assert(eventHandler, `event handler for ${event.type} not found`);
-
-        const state = await eventHandler.handle(
-          { state: this._state } as never,
-          event
-        );
-
-        this._state = state;
-        this._version = event.aggregate.version;
-      }
+      await this.digest(events as TEvent[]);
 
       release();
     } catch (err) {

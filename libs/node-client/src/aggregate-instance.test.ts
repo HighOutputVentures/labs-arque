@@ -74,7 +74,7 @@ describe('AggregateInstance', () => {
 
       const eventHandler = {
         type: EventType.AccountUpdated,
-        handle: jest.fn((ctx, event: AccountUpdatedEvent) => {
+        handle: jest.fn(async (ctx, event: AccountUpdatedEvent) => {
           return {
             root: {
               ...ctx.state.root,
@@ -135,7 +135,7 @@ describe('AggregateInstance', () => {
 
       const eventHandler = {
         type: EventType.AccountUpdated,
-        handle: jest.fn((ctx, event: AccountUpdatedEvent) => {
+        handle: jest.fn(async (ctx, event: AccountUpdatedEvent) => {
           return {
             root: {
               ...ctx.state.root,
@@ -187,7 +187,7 @@ describe('AggregateInstance', () => {
 
       const eventHandler = {
         type: EventType.AccountUpdated,
-        handle: jest.fn((ctx, event: AccountUpdatedEvent) => {
+        handle: jest.fn(async (ctx, event: AccountUpdatedEvent) => {
           return {
             root: {
               ...ctx.state.root,
@@ -313,7 +313,7 @@ describe('AggregateInstance', () => {
 
       const eventHandler = {
         type: EventType.AccountCreated,
-        handle: jest.fn((ctx, event: AccountCreatedEvent) => {
+        handle: jest.fn(async (ctx, event: AccountCreatedEvent) => {
           return {
             root: {
               ...(ctx.state ? ctx.state.root : {}),
@@ -326,7 +326,7 @@ describe('AggregateInstance', () => {
 
       const commandHandler = {
         type: CommandType.CreateAccount,
-        handle: jest.fn((ctx, command: CreateAccountCommand) => {
+        handle: jest.fn(async (ctx, command: CreateAccountCommand) => {
           if (ctx.state) {
             throw new Error('account already exists');
           }
@@ -409,7 +409,7 @@ describe('AggregateInstance', () => {
 
       const eventHandler = {
         type: EventType.AccountUpdated,
-        handle: jest.fn((ctx, event: AccountUpdatedEvent) => {
+        handle: jest.fn(async (ctx, event: AccountUpdatedEvent) => {
           return {
             root: {
               ...(ctx.state ? ctx.state.root : {}),
@@ -422,7 +422,7 @@ describe('AggregateInstance', () => {
 
       const commandHandler = {
         type: CommandType.CreateAccount,
-        handle: jest.fn((ctx, command: CreateAccountCommand) => {
+        handle: jest.fn(async (ctx, command: CreateAccountCommand) => {
           if (ctx.state) {
             throw new Error('account already exists');
           }
@@ -515,7 +515,7 @@ describe('AggregateInstance', () => {
 
       const eventHandler = {
         type: EventType.AccountUpdated,
-        handle: jest.fn((ctx, event: AccountUpdatedEvent) => {
+        handle: jest.fn(async (ctx, event: AccountUpdatedEvent) => {
           return {
             root: {
               ...(ctx.state ? ctx.state.root : {}),
@@ -528,7 +528,7 @@ describe('AggregateInstance', () => {
 
       const commandHandler = {
         type: CommandType.UpdateAccount,
-        handle: jest.fn((ctx, command: UpdateAccountCommand) => {
+        handle: jest.fn(async (ctx, command: UpdateAccountCommand) => {
           return {
             type: EventType.AccountUpdated,
             body: command.params,
@@ -625,7 +625,7 @@ describe('AggregateInstance', () => {
 
       const eventHandler = {
         type: EventType.AccountUpdated,
-        handle: jest.fn((ctx, event: AccountUpdatedEvent) => {
+        handle: jest.fn(async (ctx, event: AccountUpdatedEvent) => {
           return {
             root: {
               ...(ctx.state ? ctx.state.root : {}),
@@ -638,7 +638,7 @@ describe('AggregateInstance', () => {
 
       const commandHandler = {
         type: CommandType.UpdateAccount,
-        handle: jest.fn((ctx, command: UpdateAccountCommand) => {
+        handle: jest.fn(async (ctx, command: UpdateAccountCommand) => {
           return {
             type: EventType.AccountUpdated,
             body: command.params,
@@ -694,7 +694,6 @@ describe('AggregateInstance', () => {
         aggregate.process(secondCommand),
       ]);
 
-      console.log({ firstCommand, secondCommand });
       expect(ClientMock.listAggregateEvents).toBeCalledTimes(2);
 
       expect(
