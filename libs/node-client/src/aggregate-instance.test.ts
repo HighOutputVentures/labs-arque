@@ -41,6 +41,11 @@ describe('AggregateInstance', () => {
     Pick<Account, 'name' | 'password' | 'metadata'>
   >;
 
+  type UpdateAccountCommand = Command<
+    CommandType.UpdateAccount,
+    Partial<Pick<Account, 'password' | 'metadata'>>
+  >;
+
   describe('#reload', () => {
     test.concurrent('update to the latest state', async () => {
       const id = new ObjectId();
@@ -380,9 +385,22 @@ describe('AggregateInstance', () => {
     });
     test.concurrent('invalid command', async () => {
       const id = new ObjectId();
+      const event = {
+        id: new ObjectId(),
+        aggregate: {
+          id,
+          version: 2,
+        },
+        type: EventType.AccountUpdated,
+        body: {
+          password: await hash(faker.internet.password(), 10),
+        },
+        meta: {},
+        timestamp: new Date(),
+      };
 
       const ClientMock = {
-        listAggregateEvents: jest.fn().mockResolvedValue([]),
+        listAggregateEvents: jest.fn().mockResolvedValue([event]),
         insertEvent: jest.fn().mockResolvedValue(null),
       };
 
@@ -442,31 +460,52 @@ describe('AggregateInstance', () => {
         [eventHandler]
       );
 
-      expect(
-        aggregate.process({
-          type: CommandType.CreateAccount,
-          params: {
-            name: faker.name.firstName().toLowerCase(),
-            password: await hash(faker.internet.password(), 10),
-            metadata: {
-              firstName: faker.name.firstName(),
-              lastName: faker.name.lastName(),
-            },
+      const command = {
+        type: CommandType.CreateAccount,
+        params: {
+          name: faker.name.firstName().toLowerCase(),
+          password: await hash(faker.internet.password(), 10),
+          metadata: {
+            firstName: faker.name.firstName(),
+            lastName: faker.name.lastName(),
           },
-        })
-      ).rejects.toThrow('account already exists');
+        },
+      };
+
+      await expect(aggregate.process(command)).rejects.toThrow(
+        'account already exists'
+      );
+
+      expect(ClientMock.listAggregateEvents).toBeCalledTimes(1);
+
+      expect(
+        ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.id
+      ).toEqual(id);
+      expect(
+        ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.version
+      ).toEqual(version);
+
+      expect(ClientMock.insertEvent).not.toBeCalled();
+
+      expect(eventHandler.handle).toBeCalledTimes(1);
+      expect(eventHandler.handle.mock.calls[0][0].state.root.id).toEqual(id);
+      expect(eventHandler.handle.mock.calls[0][1]).toEqual(event);
+
+      expect(commandHandler.handle).toBeCalledTimes(1);
+      expect(commandHandler.handle.mock.calls[0][0].state.root.id).toEqual(id);
+      expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
     });
     test.concurrent('invalid aggregate version', async () => {
       const id = new ObjectId();
-      const version = 0;
+      const version = 2;
 
       const ClientMock = {
         listAggregateEvents: jest.fn().mockResolvedValue([]),
         insertEvent: jest.fn().mockRejectedValue(
           new InvalidAggregateVersionError({
             aggregate: id,
-            currentVersion: version,
-            nextVersion: 1,
+            currentVersion: 1,
+            nextVersion: version,
           })
         ),
       };
@@ -485,17 +524,27 @@ describe('AggregateInstance', () => {
       };
 
       const commandHandler = {
-        type: CommandType.CreateAccount,
-        handle: jest.fn((ctx, command: CreateAccountCommand) => {
-          if (ctx.state) {
-            throw new Error('account already exists');
-          }
-
+        type: CommandType.UpdateAccount,
+        handle: jest.fn((ctx, command: UpdateAccountCommand) => {
           return {
-            type: EventType.AccountCreated,
+            type: EventType.AccountUpdated,
             body: command.params,
           };
         }),
+      };
+
+      const state = {
+        root: {
+          id,
+          name: faker.name.firstName().toLowerCase(),
+          password: await hash(faker.internet.password(), 10),
+          metadata: {
+            firstName: faker.name.firstName(),
+            lastName: faker.name.lastName(),
+          },
+          dateTimeCreated: new Date(),
+          dateTimeLastUpdated: new Date(),
+        },
       };
 
       let aggregate = new AggregateInstance<
@@ -506,25 +555,38 @@ describe('AggregateInstance', () => {
       >(
         id,
         version,
-        null,
+        state,
         ClientMock as never,
         [commandHandler],
         [eventHandler]
       );
 
+      const command = {
+        type: CommandType.UpdateAccount,
+        params: {
+          name: faker.name.firstName().toLowerCase(),
+          password: await hash(faker.internet.password(), 10),
+        },
+      };
+
+      await expect(aggregate.process(command)).rejects.toThrow(
+        'invalid aggregate version'
+      );
+
+      expect(ClientMock.listAggregateEvents).toBeCalledTimes(1);
+
       expect(
-        aggregate.process({
-          type: CommandType.CreateAccount,
-          params: {
-            name: faker.name.firstName().toLowerCase(),
-            password: await hash(faker.internet.password(), 10),
-            metadata: {
-              firstName: faker.name.firstName(),
-              lastName: faker.name.lastName(),
-            },
-          },
-        })
-      ).rejects.toThrow('invalid aggregate version');
+        ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.id
+      ).toEqual(id);
+      expect(
+        ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.version
+      ).toEqual(version);
+
+      expect(eventHandler.handle).not.toBeCalled();
+
+      expect(commandHandler.handle).toBeCalledTimes(1);
+      expect(commandHandler.handle.mock.calls[0][0].state.root.id).toEqual(id);
+      expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
     });
     test.todo('multiple concurrent execution');
   });
