@@ -6,7 +6,7 @@ import { Mutex } from 'async-mutex';
 import assert from 'assert';
 import backoff, { Backoff } from 'backoff';
 import { InvalidAggregateVersionError } from './error';
-
+import R, { last } from 'ramda';
 export class AggregateInstance<
   TCommand extends Command,
   TEvent extends Event,
@@ -100,7 +100,9 @@ export class AggregateInstance<
         assert(eventHandler, `event handler for ${event.type} not found`);
 
         const state = await eventHandler.handle(
-          { state: this._state } as never,
+          {
+            state: this._state,
+          } as TContext & { state: TState },
           event
         );
 
@@ -113,17 +115,67 @@ export class AggregateInstance<
       assert(commandHandler, `command handler for ${command.type} not found`);
 
       const generatedEvent = await commandHandler.handle(
-        { state: this._state } as never,
+        {
+          state: this._state,
+        } as TContext & { state: TState },
         command
       );
 
+      let lastEvent = null;
+
       if (Array.isArray(generatedEvent)) {
         for await (const event of generatedEvent) {
-          await this.client.insertEvent(event as never);
+          await this.client.insertEvent({
+            ...event,
+            aggregate: {
+              id: this._id,
+              version: this._version + 1,
+            },
+            meta: {},
+          });
+
+          lastEvent = {
+            ...event,
+            aggregate: {
+              id: this._id,
+              version: this._version + 1,
+            },
+            meta: {},
+          };
         }
       } else {
-        await this.client.insertEvent(generatedEvent as never);
+        await this.client.insertEvent({
+          ...generatedEvent,
+          aggregate: {
+            id: this._id,
+            version: this._version + 1,
+          },
+          meta: {},
+        });
+
+        lastEvent = {
+          ...generatedEvent,
+          aggregate: {
+            id: this._id,
+            version: this._version + 1,
+          },
+          meta: {},
+        };
       }
+
+      const eventHandler = this.eventHandlers.get(lastEvent.type);
+
+      assert(eventHandler, `event handler for ${lastEvent.type} not found`);
+
+      const state = await eventHandler.handle(
+        {
+          state: this._state,
+        } as TContext & { state: TState },
+        lastEvent
+      );
+
+      this._state = state;
+      this._version = lastEvent.aggregate.version;
 
       release();
     } catch (err) {

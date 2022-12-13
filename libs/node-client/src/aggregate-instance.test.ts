@@ -4,9 +4,8 @@ import { Command } from './command';
 import { Event } from './event';
 import { faker } from '@faker-js/faker';
 import { hash } from 'bcrypt';
-import { toASCII } from 'punycode';
 import { InvalidAggregateVersionError } from './error';
-
+import R from 'ramda';
 describe('AggregateInstance', () => {
   type Account = {
     id: ObjectId;
@@ -26,6 +25,10 @@ describe('AggregateInstance', () => {
     AccountUpdated = 1,
   }
 
+  type AccountCreatedEvent = Event<
+    EventType.AccountCreated,
+    Pick<Account, 'name' | 'password' | 'metadata'>
+  >;
   type AccountUpdatedEvent = Event<
     EventType.AccountUpdated,
     Partial<Pick<Account, 'password' | 'metadata'>>
@@ -309,11 +312,11 @@ describe('AggregateInstance', () => {
       };
 
       const eventHandler = {
-        type: EventType.AccountUpdated,
-        handle: jest.fn((ctx, event: AccountUpdatedEvent) => {
+        type: EventType.AccountCreated,
+        handle: jest.fn((ctx, event: AccountCreatedEvent) => {
           return {
             root: {
-              ...ctx.state.root,
+              ...(ctx.state ? ctx.state.root : {}),
               ...event.body,
               dateTimeLastUpdated: event.timestamp,
             },
@@ -351,7 +354,7 @@ describe('AggregateInstance', () => {
         [eventHandler]
       );
 
-      await aggregate.process({
+      const command = {
         type: CommandType.CreateAccount,
         params: {
           name: faker.name.firstName().toLowerCase(),
@@ -361,7 +364,9 @@ describe('AggregateInstance', () => {
             lastName: faker.name.lastName(),
           },
         },
-      });
+      };
+
+      await aggregate.process(command);
 
       expect(ClientMock.listAggregateEvents).toBeCalledTimes(1);
 
@@ -372,16 +377,14 @@ describe('AggregateInstance', () => {
         ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.version
       ).toEqual(version);
 
-      expect(eventHandler.handle).not.toBeCalled();
+      expect(eventHandler.handle).toBeCalledTimes(1);
 
       expect(ClientMock.insertEvent).toBeCalledTimes(1);
 
       expect(commandHandler.handle).toBeCalledTimes(1);
 
       expect(commandHandler.handle.mock.calls[0][0].state).toBeNull();
-      expect(commandHandler.handle.mock.calls[0][1].type).toEqual(
-        CommandType.CreateAccount
-      );
+      expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
     });
     test.concurrent('invalid command', async () => {
       const id = new ObjectId();
@@ -409,7 +412,7 @@ describe('AggregateInstance', () => {
         handle: jest.fn((ctx, event: AccountUpdatedEvent) => {
           return {
             root: {
-              ...ctx.state.root,
+              ...(ctx.state ? ctx.state.root : {}),
               ...event.body,
               dateTimeLastUpdated: event.timestamp,
             },
@@ -515,7 +518,7 @@ describe('AggregateInstance', () => {
         handle: jest.fn((ctx, event: AccountUpdatedEvent) => {
           return {
             root: {
-              ...ctx.state.root,
+              ...(ctx.state ? ctx.state.root : {}),
               ...event.body,
               dateTimeLastUpdated: event.timestamp,
             },
@@ -588,6 +591,137 @@ describe('AggregateInstance', () => {
       expect(commandHandler.handle.mock.calls[0][0].state.root.id).toEqual(id);
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
     });
-    test.todo('multiple concurrent execution');
+    test.concurrent('multiple concurrent execution', async () => {
+      const id = new ObjectId();
+
+      let currentVersion = 1;
+      let currentPassword = await hash(faker.internet.password(), 10);
+
+      const ClientMock = {
+        listAggregateEvents: jest.fn().mockImplementation(async (_params) => {
+          return [
+            {
+              id: new ObjectId(),
+              aggregate: {
+                id,
+                version: currentVersion,
+              },
+              type: EventType.AccountUpdated,
+              body: {
+                password: currentPassword,
+              },
+              meta: {},
+              timestamp: new Date(),
+            },
+          ];
+        }),
+        insertEvent: jest.fn().mockImplementation(async (event: Event) => {
+          currentVersion = event.aggregate.version;
+          currentPassword = event.body['password'];
+
+          return null;
+        }),
+      };
+
+      const eventHandler = {
+        type: EventType.AccountUpdated,
+        handle: jest.fn((ctx, event: AccountUpdatedEvent) => {
+          return {
+            root: {
+              ...(ctx.state ? ctx.state.root : {}),
+              ...event.body,
+              dateTimeLastUpdated: event.timestamp,
+            },
+          };
+        }),
+      };
+
+      const commandHandler = {
+        type: CommandType.UpdateAccount,
+        handle: jest.fn((ctx, command: UpdateAccountCommand) => {
+          return {
+            type: EventType.AccountUpdated,
+            body: command.params,
+          };
+        }),
+      };
+
+      const version = 1;
+      const state = {
+        root: {
+          id,
+          name: faker.name.firstName().toLowerCase(),
+          password: currentPassword,
+          metadata: {
+            firstName: faker.name.firstName(),
+            lastName: faker.name.lastName(),
+          },
+          dateTimeCreated: new Date(),
+          dateTimeLastUpdated: new Date(),
+        },
+      };
+
+      let aggregate = new AggregateInstance<
+        Command,
+        Event,
+        AccountAggregateState,
+        {}
+      >(
+        id,
+        version,
+        state,
+        ClientMock as never,
+        [commandHandler],
+        [eventHandler]
+      );
+
+      const firstCommand = {
+        type: CommandType.UpdateAccount,
+        params: {
+          password: await hash(faker.internet.password(), 10),
+        },
+      };
+
+      const secondCommand = {
+        type: CommandType.UpdateAccount,
+        params: {
+          password: await hash(faker.internet.password(), 10),
+        },
+      };
+
+      await Promise.all([
+        aggregate.process(firstCommand),
+        aggregate.process(secondCommand),
+      ]);
+
+      console.log({ firstCommand, secondCommand });
+      expect(ClientMock.listAggregateEvents).toBeCalledTimes(2);
+
+      expect(
+        ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.id
+      ).toEqual(id);
+      expect(
+        ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.version
+      ).toEqual(version);
+
+      expect(
+        ClientMock.listAggregateEvents.mock.calls[1][0].aggregate.id
+      ).toEqual(id);
+      expect(
+        ClientMock.listAggregateEvents.mock.calls[1][0].aggregate.version
+      ).toEqual(version + 1);
+
+      expect(eventHandler.handle).toBeCalledTimes(4);
+
+      expect(ClientMock.insertEvent).toBeCalledTimes(2);
+
+      expect(commandHandler.handle).toBeCalledTimes(2);
+
+      expect(commandHandler.handle.mock.calls[0][0].state.root.id).toEqual(id);
+      expect(commandHandler.handle.mock.calls[0][1]).toEqual(firstCommand);
+
+      expect(commandHandler.handle.mock.calls[1][0].state.root.id).toEqual(id);
+      expect(commandHandler.handle.mock.calls[1][1]).toEqual(secondCommand);
+    });
   });
 });
