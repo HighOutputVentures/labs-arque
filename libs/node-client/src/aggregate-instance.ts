@@ -1,12 +1,13 @@
 import { Client } from './client';
 import { Command, CommandHandler, GeneratedEvent } from './command';
-import { Event, EventHandler } from './event';
+import { Event, EventHandler, EventHandlerContext } from './event';
 import { ObjectId } from './object-id';
 import { Mutex } from 'async-mutex';
 import assert from 'assert';
-import backoff, { Backoff } from 'backoff';
+import { Backoff, FibonacciStrategy } from 'backoff';
 import { InvalidAggregateVersionError } from './error';
 import R, { last } from 'ramda';
+
 export class AggregateInstance<
   TCommand extends Command,
   TEvent extends Event,
@@ -16,8 +17,6 @@ export class AggregateInstance<
   private mutex: Mutex;
   private eventHandlers: Map<number, EventHandler<TState, TContext>> =
     new Map();
-
-  private backoffInstance: Backoff;
 
   private commandHandlers: Map<
     number,
@@ -41,14 +40,6 @@ export class AggregateInstance<
     for (const eventHandler of eventHandlers) {
       this.eventHandlers.set(eventHandler.type, eventHandler);
     }
-
-    this.backoffInstance = backoff.fibonacci({
-      randomisationFactor: 0,
-      initialDelay: 10,
-      maxDelay: 300,
-    });
-
-    this.backoffInstance.failAfter(10);
   }
 
   get id() {
@@ -67,12 +58,12 @@ export class AggregateInstance<
     for (const event of events) {
       const eventHandler = this.eventHandlers.get(event.type);
 
-      assert(eventHandler, `event handler for ${event.type} not found`);
+      assert(eventHandler, `event handler for ${event.type} does not exist`);
 
       const state = await eventHandler.handle(
         {
           state: this._state,
-        } as TContext & { state: TState },
+        } as EventHandlerContext<TState, TContext>,
         event
       );
 
@@ -82,37 +73,53 @@ export class AggregateInstance<
   }
 
   public async process(command: TCommand): Promise<void> {
-    const context = this;
-    this.backoffInstance.on('ready', async function () {
-      try {
-        await context.processCommand(command);
-      } catch (err) {
-        if (err instanceof InvalidAggregateVersionError)
-          context.backoffInstance.backoff();
+    const backoff = new Backoff(new FibonacciStrategy({
+      randomisationFactor: 0.2,
+      initialDelay: 100,
+      maxDelay: 5000,
+    }))
 
-        throw err;
-      }
+    backoff.failAfter(10);
+
+    return new Promise((resolve, reject) => {
+      backoff.on('ready', async () => {
+        try {
+          await this.processCommand(command);
+
+          resolve();
+        } catch (err) {
+          if (err instanceof InvalidAggregateVersionError) {
+            backoff.backoff(err);
+          }
+
+          reject(err);
+        }
+      });
+
+      backoff.once('fail', function (err) {
+        reject(err);
+      });
+  
+      backoff.backoff();
     });
-
-    this.backoffInstance.backoff();
   }
 
   private async processCommand(command: TCommand): Promise<void> {
     const release = await this.mutex.acquire();
 
     try {
-      let events = await this.client.listAggregateEvents({
+      let events = await this.client.listAggregateEvents<TEvent>({
         aggregate: {
           id: this._id,
           version: this._version,
         },
       });
 
-      await this.digest(events as TEvent[]);
+      await this.digest(events);
 
       const commandHandler = this.commandHandlers.get(command.type);
 
-      assert(commandHandler, `command handler for ${command.type} not found`);
+      assert(commandHandler, `command handler for ${command.type} does not exist`);
 
       const generatedEvent = await commandHandler.handle(
         {
@@ -121,28 +128,24 @@ export class AggregateInstance<
         command
       );
 
-      let lastEvent = null;
-
       if (Array.isArray(generatedEvent)) {
-        let i = 0;
-        let len = generatedEvent.length;
-        for await (const event of generatedEvent) {
-          const eventData = {
-            ...event,
+        // TODO: revamp this
+        for await (const _generatedEvent of generatedEvent) {
+          const params = {
+            ..._generatedEvent,
             aggregate: {
               id: this._id,
-              version: this._version + i,
+              version: this._version + 1,
             },
             meta: {},
           };
-          await this.client.insertEvent(eventData);
 
-          if (len === i + 1) lastEvent = eventData;
+          const event = await this.client.insertEvent<TEvent>(params);
 
-          i += 1;
+          await this.digest([event]);
         }
       } else {
-        const eventData = {
+        const params = {
           ...generatedEvent,
           aggregate: {
             id: this._id,
@@ -150,12 +153,11 @@ export class AggregateInstance<
           },
           meta: {},
         };
-        await this.client.insertEvent(eventData);
 
-        lastEvent = eventData;
+        const event = await this.client.insertEvent<TEvent>(params);
+
+        await this.digest([event]);
       }
-
-      await this.digest([lastEvent]);
 
       release();
     } catch (err) {

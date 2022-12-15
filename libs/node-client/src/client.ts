@@ -37,12 +37,10 @@ export class Client {
   }
 
   public async insertEvent<
-    TType extends number = number,
-    TBody extends Record<string, any> = Record<string, any>,
-    TMeta extends Record<string, any> = Record<string, any>
+    TEvent extends Event = Event,
   >(
-    _params: InsertEventParams<TType, TBody, TMeta>
-  ): Promise<Event<TType, TBody, TMeta>> {
+    _params: InsertEventParams<TEvent['type'], TEvent['body'], TEvent['meta']>
+  ): Promise<TEvent> {
     throw new Error('not implemented');
   }
 
