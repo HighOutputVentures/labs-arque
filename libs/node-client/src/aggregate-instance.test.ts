@@ -5,9 +5,7 @@ import { Event } from './event';
 import { faker } from '@faker-js/faker';
 import { hash } from 'bcrypt';
 import { InvalidAggregateVersionError } from './error';
-import R from 'ramda';
-import { Client } from './client';
-import { BackoffTest } from './backoff-test';
+
 describe('AggregateInstance', () => {
   type Account = {
     id: ObjectId;
@@ -310,7 +308,7 @@ describe('AggregateInstance', () => {
 
       const ClientMock = {
         listAggregateEvents: jest.fn().mockResolvedValue([]),
-        insertEvent: jest.fn().mockResolvedValue(null),
+        insertEvent: jest.fn().mockImplementation(async (params) => params),
       };
 
       const eventHandler = {
@@ -615,7 +613,7 @@ describe('AggregateInstance', () => {
           currentVersion = event.aggregate.version;
           currentPassword = event.body['password'];
 
-          return null;
+          return event;
         }),
       };
 
