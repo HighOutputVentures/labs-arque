@@ -6,6 +6,8 @@ import { faker } from '@faker-js/faker';
 import { hash } from 'bcrypt';
 import { InvalidAggregateVersionError } from './error';
 import R from 'ramda';
+import { Client } from './client';
+import { BackoffTest } from './backoff-test';
 describe('AggregateInstance', () => {
   type Account = {
     id: ObjectId;
@@ -330,7 +332,6 @@ describe('AggregateInstance', () => {
           if (ctx.state) {
             throw new Error('account already exists');
           }
-
           return {
             type: EventType.AccountCreated,
             body: command.params,
@@ -369,20 +370,15 @@ describe('AggregateInstance', () => {
       await aggregate.process(command);
 
       expect(ClientMock.listAggregateEvents).toBeCalledTimes(1);
-
       expect(
         ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.id
       ).toEqual(id);
       expect(
         ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.version
       ).toEqual(version);
-
       expect(eventHandler.handle).toBeCalledTimes(1);
-
       expect(ClientMock.insertEvent).toBeCalledTimes(1);
-
       expect(commandHandler.handle).toBeCalledTimes(1);
-
       expect(commandHandler.handle.mock.calls[0][0].state).toBeNull();
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
     });

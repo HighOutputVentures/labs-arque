@@ -1,5 +1,5 @@
 import { Client } from './client';
-import { Command, CommandHandler } from './command';
+import { Command, CommandHandler, GeneratedEvent } from './command';
 import { Event, EventHandler } from './event';
 import { ObjectId } from './object-id';
 import { Mutex } from 'async-mutex';
@@ -94,15 +94,9 @@ export class AggregateInstance<
       }
     });
 
-    try {
-      await context.processCommand(command);
-    } catch (err) {
-      if (err instanceof InvalidAggregateVersionError)
-        context.backoffInstance.backoff();
-
-      throw err;
-    }
+    this.backoffInstance.backoff();
   }
+
   private async processCommand(command: TCommand): Promise<void> {
     const release = await this.mutex.acquire();
 
@@ -130,18 +124,22 @@ export class AggregateInstance<
       let lastEvent = null;
 
       if (Array.isArray(generatedEvent)) {
+        let i = 0;
+        let len = generatedEvent.length;
         for await (const event of generatedEvent) {
           const eventData = {
             ...event,
             aggregate: {
               id: this._id,
-              version: this._version + 1,
+              version: this._version + i,
             },
             meta: {},
           };
           await this.client.insertEvent(eventData);
 
-          lastEvent = eventData;
+          if (len === i + 1) lastEvent = eventData;
+
+          i += 1;
         }
       } else {
         const eventData = {

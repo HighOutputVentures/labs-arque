@@ -41,6 +41,7 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
-    "verbose": true
+    "verbose": true,
+    "testTimeout": 20000
   }
 }
