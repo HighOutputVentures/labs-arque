@@ -1,4 +1,7 @@
-use arque_common::request_generated::{Event, EventArgs};
+use arque_common::{
+    object_id::ObjectId,
+    request_generated::{Event, EventArgs},
+};
 use flatbuffers::{FlatBufferBuilder, WIPOffset};
 use std::iter::repeat_with;
 
@@ -17,19 +20,28 @@ pub struct GenerateFakeEventArgs<'a> {
 }
 
 pub fn generate_fake_event<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-  fbb: &'mut_bldr mut FlatBufferBuilder<'bldr>,
-  args: &'args GenerateFakeEventArgs,
+    fbb: &'mut_bldr mut FlatBufferBuilder<'bldr>,
+    args: &'args GenerateFakeEventArgs,
 ) -> WIPOffset<Event<'args>> {
-  let args = EventArgs {
-      id: Some(fbb.create_vector(args.id.unwrap_or(&random_bytes(12)))),
-      type_: args.type_.unwrap_or(fastrand::u16(..)),
-      aggregate_id: Some(
-          fbb.create_vector(args.aggregate_id.unwrap_or(&random_bytes(12))),
-      ),
-      aggregate_version: args.aggregate_version.unwrap_or(1),
-      body: Some(fbb.create_vector(args.body.unwrap_or(&random_bytes(1024)))),
-      meta: Some(fbb.create_vector(args.meta.unwrap_or(&random_bytes(64)))),
-  };
+    let mut body: Vec<u8> = vec![];
+    let mut meta: Vec<u8> = vec![];
 
-  Event::create(fbb, &args)
+    let args = EventArgs {
+        id: Some(fbb.create_vector(args.id.unwrap_or(&random_bytes(12)))),
+        type_: args.type_.unwrap_or(fastrand::u16(..)),
+        aggregate_id: Some(fbb.create_vector(args.aggregate_id.unwrap_or(&random_bytes(12)))),
+        aggregate_version: args.aggregate_version.unwrap_or(1),
+        body: Some(fbb.create_vector(args.body.unwrap_or_else(|| {
+            body = random_bytes(256);
+
+            &body
+        }))),
+        meta: Some(fbb.create_vector(args.meta.unwrap_or_else(|| {
+            meta = random_bytes(64);
+
+            &meta
+        }))),
+    };
+
+    Event::create(fbb, &args)
 }

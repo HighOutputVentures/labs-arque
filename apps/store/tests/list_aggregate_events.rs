@@ -111,7 +111,6 @@ async fn test_list_aggregate_events() {
     stop_tx.send(()).unwrap();
 }
 
-
 #[rstest]
 #[tokio::test]
 async fn test_empty_list() {
@@ -120,8 +119,6 @@ async fn test_empty_list() {
     let tcp_port = TcpPort::any("127.0.0.1").unwrap();
 
     let temp_dir = TempDir::new("arque_test").unwrap();
-
-
 
     std::thread::spawn(move || {
         let mut server_endpoint = String::from("tcp://*:");

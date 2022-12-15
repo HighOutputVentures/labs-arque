@@ -1,8 +1,8 @@
 use super::ControllerContext;
 use crate::store::InsertEventParams;
 use arque_common::request_generated::{Event, EventArgs, InsertEventRequestBody};
-use flatbuffers::FlatBufferBuilder;
 use custom_error::custom_error;
+use flatbuffers::FlatBufferBuilder;
 
 custom_error! {pub InsertEventError
     InvalidAggregateVersion = "invalid aggregate version",
@@ -20,7 +20,13 @@ pub fn insert_event(
     let args = EventArgs {
         id: Some(bldr.create_vector(event.id().expect("event.id should not be None"))),
         type_: event.type_(),
-        aggregate_id: Some(bldr.create_vector(event.aggregate_id().expect("event.aggregate_id should not be None"))),
+        aggregate_id: Some(
+            bldr.create_vector(
+                event
+                    .aggregate_id()
+                    .expect("event.aggregate_id should not be None"),
+            ),
+        ),
         aggregate_version: event.aggregate_version(),
         body: Some(bldr.create_vector(event.body().expect("event.body should not be None"))),
         meta: event.meta().map(|meta| bldr.create_vector(meta)),
@@ -32,7 +38,9 @@ pub fn insert_event(
 
     let params = InsertEventParams {
         id: event.id().expect("event.id should not be None"),
-        aggregate_id: event.aggregate_id().expect("event.aggregate_id should not be None"),
+        aggregate_id: event
+            .aggregate_id()
+            .expect("event.aggregate_id should not be None"),
         aggregate_version: event.aggregate_version(),
         payload: &bldr.finished_data().to_vec(),
     };

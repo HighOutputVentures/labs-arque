@@ -1,8 +1,8 @@
 mod controllers;
 mod server;
 mod store;
-mod stream;
 mod store_next;
+mod stream;
 
 use server::{Server, ServerConfig};
 use std::error::Error;
@@ -22,11 +22,11 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     //   vec![]
     // }, rx)?;
- 
+
     let server_endpoint = String::from("tcp://*:4000");
     let server_temp = server_endpoint.clone();
     let temp_dir = TempDir::new("arque_test").unwrap();
-   
+
     let server = Server::new(ServerConfig {
         data_path: Some(temp_dir.path()),
     });
@@ -35,8 +35,6 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     println!("server started @ {:?}", server_temp);
 
     server.serve(server_endpoint, _rx).unwrap();
-
-  
 
     Ok(())
 }

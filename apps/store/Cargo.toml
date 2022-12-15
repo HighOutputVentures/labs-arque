@@ -32,5 +32,9 @@ features = [
 ]
 
 [dev-dependencies]
-rstest = "0.15.0"
+rstest = "0.15"
+criterion = "0.3"
 
+[[bench]]
+name = "store_insert_event"
+harness = false

@@ -3,6 +3,13 @@ mod rocksdb_store;
 use custom_error::custom_error;
 use rocksdb::DBPinnableSlice;
 
+pub use rocksdb_store::RocksDBStore;
+
+custom_error! {pub StoreError
+    InvalidAggregateVersion{current:u32, next:u32} = "invalid aggregate version: current={current},next={next}",
+    Unexpected{message:String} = "unexpected: {message}"
+}
+
 custom_error! {pub InsertEventError
     InvalidAggregateVersion = "invalid aggregate version",
     Unexpected{message:String} = "unexpected: {message}"
@@ -26,15 +33,11 @@ pub struct ListAggregateEventsParams<'a> {
 }
 
 pub struct Event<'a> {
-    buf: DBPinnableSlice<'a>
+    buf: DBPinnableSlice<'a>,
 }
 
 pub trait Store {
-    fn insert_event(
-        &self,
-        params: &InsertEventParams,
-    ) -> Result<(), InsertEventError>;
-
+    fn insert_event(&self, params: &InsertEventParams) -> Result<(), StoreError>;
     fn list_aggregate_events(
         &self,
         params: &ListAggregateEventsParams,

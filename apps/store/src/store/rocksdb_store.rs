@@ -1,8 +1,8 @@
-use super::{InsertEventError, InsertEventParams, ListAggregateEventsParams, Store};
 use super::store::{ListAggregateEventsError, ListAggregateEventsParamsNext};
+use super::{InsertEventError, InsertEventParams, ListAggregateEventsParams, Store};
 use byteorder::{BigEndian, ByteOrder};
-use rocksdb::{Error, WriteBatch, DB, DBPinnableSlice};
 use rocksdb::Options;
+use rocksdb::{DBPinnableSlice, Error, WriteBatch, DB};
 use std::path::Path;
 
 pub struct RocksDBStore {
@@ -30,24 +30,32 @@ impl RocksDBStore {
     ) -> Result<Vec<DBPinnableSlice>, ListAggregateEventsError> {
         let cf1 = match self.db.cf_handle("events") {
             Some(cf) => cf,
-            None => return Err(ListAggregateEventsError::Unexpected { message: "`events` column family should exist".to_string() }),
+            None => {
+                return Err(ListAggregateEventsError::Unexpected {
+                    message: "`events` column family should exist".to_string(),
+                })
+            }
         };
 
         let cf2 = match self.db.cf_handle("aggregate_events") {
             Some(cf) => cf,
-            None => return Err(ListAggregateEventsError::Unexpected { message: "`aggregate_events` column family should exist".to_string() }),
+            None => {
+                return Err(ListAggregateEventsError::Unexpected {
+                    message: "`aggregate_events` column family should exist".to_string(),
+                })
+            }
         };
 
         let aggregate_version = params.aggregate_version.unwrap_or(0);
 
-        let anchor = [
-            params.aggregate_id,
-            &aggregate_version.to_be_bytes(),
-        ].concat();
+        let anchor = [params.aggregate_id, &aggregate_version.to_be_bytes()].concat();
 
         let ids = self
             .db
-            .iterator_cf(cf2, rocksdb::IteratorMode::From(anchor.as_slice(), rocksdb::Direction::Forward))
+            .iterator_cf(
+                cf2,
+                rocksdb::IteratorMode::From(anchor.as_slice(), rocksdb::Direction::Forward),
+            )
             .take(params.limit.unwrap_or(100))
             .take_while(|item| match item {
                 Ok((key, _)) => key.starts_with(params.aggregate_id),
@@ -77,23 +85,39 @@ impl Store for RocksDBStore {
     fn insert_event(&self, params: InsertEventParams) -> Result<(), InsertEventError> {
         let cf1 = match self.db.cf_handle("events") {
             Some(cf) => cf,
-            None => return Err(InsertEventError::Unexpected { message: "`events` column family should exist".to_string() }),
+            None => {
+                return Err(InsertEventError::Unexpected {
+                    message: "`events` column family should exist".to_string(),
+                })
+            }
         };
 
         let cf2 = match self.db.cf_handle("aggregate_events") {
             Some(cf) => cf,
-            None => return Err(InsertEventError::Unexpected { message: "`aggregate_events` column family should exist".to_string() }),
+            None => {
+                return Err(InsertEventError::Unexpected {
+                    message: "`aggregate_events` column family should exist".to_string(),
+                })
+            }
         };
 
         let cf3 = match self.db.cf_handle("aggregate_versions") {
             Some(cf) => cf,
-            None => return Err(InsertEventError::Unexpected { message: "`aggregate_version` column family should exist".to_string() }),
+            None => {
+                return Err(InsertEventError::Unexpected {
+                    message: "`aggregate_version` column family should exist".to_string(),
+                })
+            }
         };
 
         let aggregate_version = match self.db.get_pinned_cf(cf3, params.aggregate_id) {
             Ok(Some(aggregate_version)) => BigEndian::read_u32(&aggregate_version),
             Ok(None) => 0,
-            Err(e) => return Err(InsertEventError::Unexpected { message: format!("unable to retrieve `aggregate_version`:\n{}", e) }),
+            Err(e) => {
+                return Err(InsertEventError::Unexpected {
+                    message: format!("unable to retrieve `aggregate_version`:\n{}", e),
+                })
+            }
         };
 
         if params.aggregate_version != aggregate_version + 1 {
@@ -115,8 +139,12 @@ impl Store for RocksDBStore {
         );
 
         match self.db.write(batch) {
-            Err(e) => return Err(InsertEventError::Unexpected { message: format!("unable to write to database:\n{}", e) }),
-            _ => ()
+            Err(e) => {
+                return Err(InsertEventError::Unexpected {
+                    message: format!("unable to write to database:\n{}", e),
+                })
+            }
+            _ => (),
         };
 
         Ok(())
@@ -174,7 +202,7 @@ mod helpers;
 mod tests {
 
     use super::*;
-    use arque_common::{request_generated::Event, object_id::ObjectId};
+    use arque_common::{object_id::ObjectId, request_generated::Event};
     use flatbuffers::FlatBufferBuilder;
     use helpers::{generate_fake_event, GenerateFakeEventArgs};
     use rstest::*;
