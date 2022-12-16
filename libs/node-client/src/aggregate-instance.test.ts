@@ -585,6 +585,7 @@ describe('AggregateInstance', () => {
       expect(commandHandler.handle.mock.calls[0][0].state.root.id).toEqual(id);
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
     });
+
     test.concurrent('multiple concurrent execution', async () => {
       const id = new ObjectId();
 
@@ -719,6 +720,133 @@ describe('AggregateInstance', () => {
 
       expect(commandHandler.handle.mock.calls[1][0].state.root.id).toEqual(id);
       expect(commandHandler.handle.mock.calls[1][1]).toEqual(secondCommand);
+    });
+
+    test.concurrent('process multiple events atomically', async () => {
+      const id = new ObjectId();
+
+      let currentVersion = 1;
+      let currentPassword = await hash(faker.internet.password(), 10);
+
+      const ClientMock = {
+        listAggregateEvents: jest.fn().mockImplementation(async (_params) => {
+          return [
+            {
+              id: new ObjectId(),
+              aggregate: {
+                id,
+                version: currentVersion,
+              },
+              type: EventType.AccountUpdated,
+              body: {
+                password: currentPassword,
+              },
+              meta: {},
+              timestamp: new Date(),
+            },
+          ];
+        }),
+        insertEvent: jest.fn().mockImplementation(async (event: Event) => {
+          currentVersion = event.aggregate.version;
+          currentPassword = event.body['password'];
+
+          return event;
+        }),
+      };
+
+      const eventHandler = {
+        type: EventType.AccountUpdated,
+        handle: jest.fn(async (ctx, event: AccountUpdatedEvent) => {
+          return {
+            root: {
+              ...(ctx.state ? ctx.state.root : {}),
+              ...event.body,
+              dateTimeLastUpdated: event.timestamp,
+            },
+          };
+        }),
+      };
+
+      const commandHandler = {
+        type: CommandType.UpdateAccount,
+        handle: jest.fn(async (ctx, command: UpdateAccountCommand) => {
+          return [
+            {
+              type: EventType.AccountUpdated,
+              body: {
+                metadata: {
+                  version: 1,
+                },
+                ...command.params,
+              },
+            },
+            {
+              type: EventType.AccountUpdated,
+              body: {
+                metadata: {
+                  version: 2,
+                },
+                ...command.params,
+              },
+            },
+          ];
+        }),
+      };
+
+      const version = 1;
+      const state = {
+        root: {
+          id,
+          name: faker.name.firstName().toLowerCase(),
+          password: currentPassword,
+          metadata: {
+            firstName: faker.name.firstName(),
+            lastName: faker.name.lastName(),
+          },
+          dateTimeCreated: new Date(),
+          dateTimeLastUpdated: new Date(),
+        },
+      };
+
+      let aggregate = new AggregateInstance<
+        Command,
+        Event,
+        AccountAggregateState,
+        {}
+      >(
+        id,
+        version,
+        state,
+        ClientMock as never,
+        [commandHandler],
+        [eventHandler]
+      );
+
+      const firstCommand = {
+        type: CommandType.UpdateAccount,
+        params: {
+          password: await hash(faker.internet.password(), 10),
+        },
+      };
+
+      await aggregate.process(firstCommand);
+
+      expect(ClientMock.listAggregateEvents).toBeCalledTimes(1);
+
+      expect(
+        ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.id
+      ).toEqual(id);
+      expect(
+        ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.version
+      ).toEqual(version);
+
+      expect(ClientMock.insertEvent).toBeCalledTimes(2);
+
+      expect(
+        ClientMock.insertEvent.mock.calls[0][0].body.metadata.version
+      ).toBeLessThan(
+        ClientMock.insertEvent.mock.calls[1][0].body.metadata.version
+      );
     });
   });
 });

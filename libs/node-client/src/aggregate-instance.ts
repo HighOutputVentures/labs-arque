@@ -7,7 +7,7 @@ import assert from 'assert';
 import { Backoff, FibonacciStrategy } from 'backoff';
 import { InvalidAggregateVersionError } from './error';
 import R, { last } from 'ramda';
-import PQueue from 'p-queue';
+import Queue from 'p-queue';
 
 export class AggregateInstance<
   TCommand extends Command,
@@ -135,7 +135,7 @@ export class AggregateInstance<
       );
 
       if (Array.isArray(generatedEvent)) {
-        const queue = new PQueue();
+        const queue = new Queue();
 
         for await (const _generatedEvent of generatedEvent) {
           await queue.add(async () => {
