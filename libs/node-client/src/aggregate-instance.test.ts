@@ -585,7 +585,7 @@ describe('AggregateInstance', () => {
       expect(commandHandler.handle.mock.calls[0][0].state.root.id).toEqual(id);
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
     });
-    test.concurrent.only('multiple concurrent execution', async () => {
+    test.concurrent('multiple concurrent execution', async () => {
       const id = new ObjectId();
 
       let currentVersion = 1;
