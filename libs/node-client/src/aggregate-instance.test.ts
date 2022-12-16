@@ -585,7 +585,7 @@ describe('AggregateInstance', () => {
       expect(commandHandler.handle.mock.calls[0][0].state.root.id).toEqual(id);
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
     });
-    test.concurrent('multiple concurrent execution', async () => {
+    test.concurrent.only('multiple concurrent execution', async () => {
       const id = new ObjectId();
 
       let currentVersion = 1;
@@ -684,8 +684,12 @@ describe('AggregateInstance', () => {
       };
 
       await Promise.all([
-        aggregate.process(firstCommand),
-        aggregate.process(secondCommand),
+        (async () => {
+          await aggregate.process(firstCommand);
+        })(),
+        (async () => {
+          await aggregate.process(secondCommand);
+        })(),
       ]);
 
       expect(ClientMock.listAggregateEvents).toBeCalledTimes(2);

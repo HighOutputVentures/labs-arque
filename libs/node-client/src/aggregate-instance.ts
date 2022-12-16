@@ -7,6 +7,7 @@ import assert from 'assert';
 import { Backoff, FibonacciStrategy } from 'backoff';
 import { InvalidAggregateVersionError } from './error';
 import R, { last } from 'ramda';
+import PQueue from 'p-queue';
 
 export class AggregateInstance<
   TCommand extends Command,
@@ -73,11 +74,13 @@ export class AggregateInstance<
   }
 
   public async process(command: TCommand): Promise<void> {
-    const backoff = new Backoff(new FibonacciStrategy({
-      randomisationFactor: 0.2,
-      initialDelay: 100,
-      maxDelay: 5000,
-    }))
+    const backoff = new Backoff(
+      new FibonacciStrategy({
+        randomisationFactor: 0.2,
+        initialDelay: 100,
+        maxDelay: 5000,
+      })
+    );
 
     backoff.failAfter(10);
 
@@ -99,7 +102,7 @@ export class AggregateInstance<
       backoff.once('fail', function (err) {
         reject(err);
       });
-  
+
       backoff.backoff();
     });
   }
@@ -119,7 +122,10 @@ export class AggregateInstance<
 
       const commandHandler = this.commandHandlers.get(command.type);
 
-      assert(commandHandler, `command handler for ${command.type} does not exist`);
+      assert(
+        commandHandler,
+        `command handler for ${command.type} does not exist`
+      );
 
       const generatedEvent = await commandHandler.handle(
         {
@@ -129,21 +135,26 @@ export class AggregateInstance<
       );
 
       if (Array.isArray(generatedEvent)) {
-        // TODO: revamp this
+        const queue = new PQueue();
+
         for await (const _generatedEvent of generatedEvent) {
-          const params = {
-            ..._generatedEvent,
-            aggregate: {
-              id: this._id,
-              version: this._version + 1,
-            },
-            meta: {},
-          };
+          await queue.add(async () => {
+            const params = {
+              ..._generatedEvent,
+              aggregate: {
+                id: this._id,
+                version: this._version + 1,
+              },
+              meta: {},
+            };
 
-          const event = await this.client.insertEvent<TEvent>(params);
+            const event = await this.client.insertEvent<TEvent>(params);
 
-          await this.digest([event]);
+            await this.digest([event]);
+          });
         }
+
+        await queue.onIdle();
       } else {
         const params = {
           ...generatedEvent,
