@@ -16,7 +16,9 @@ export type Event<
   timestamp: Date;
 }
 
+export type EventHandlerContext<TState, TContext extends {}> = TContext & { state: TState };
+
 export type EventHandler<TState, TContext extends {}> = {
   type: number;
-  handle(ctx: TContext & { state: TState }, event: Event): TState | Promise<TState>;
+  handle(ctx: EventHandlerContext<TState, TContext>, event: Event): TState | Promise<TState>;
 }
