@@ -1,13 +1,12 @@
 import { Client } from './client';
-import { Command, CommandHandler, GeneratedEvent } from './command';
+import { Command, CommandHandler } from './command';
 import { Event, EventHandler, EventHandlerContext } from './event';
 import { ObjectId } from './object-id';
 import { Mutex } from 'async-mutex';
 import assert from 'assert';
 import { Backoff, FibonacciStrategy } from 'backoff';
 import { InvalidAggregateVersionError } from './error';
-import R, { last } from 'ramda';
-import Queue from 'p-queue';
+import R from 'ramda';
 
 export class AggregateInstance<
   TCommand extends Command,
@@ -16,13 +15,11 @@ export class AggregateInstance<
   TContext extends {}
 > {
   private mutex: Mutex;
-  private eventHandlers: Map<number, EventHandler<TState, TContext>> =
+
+  private commandHandlers: Map<number, CommandHandler<TCommand, TEvent, TState, TContext>> =
     new Map();
 
-  private commandHandlers: Map<
-    number,
-    CommandHandler<TCommand, TEvent, TState, TContext>
-  > = new Map();
+  private eventHandlers: Map<number, EventHandler<TEvent, TState, TContext>> = new Map();
 
   constructor(
     private _id: ObjectId,
@@ -30,7 +27,7 @@ export class AggregateInstance<
     private _state: TState,
     private client: Client,
     commandHandlers: CommandHandler<TCommand, TEvent, TState, TContext>[],
-    eventHandlers: EventHandler<TState, TContext>[]
+    eventHandlers: EventHandler<TEvent, TState, TContext>[]
   ) {
     this.mutex = new Mutex();
 
@@ -122,10 +119,7 @@ export class AggregateInstance<
 
       const commandHandler = this.commandHandlers.get(command.type);
 
-      assert(
-        commandHandler,
-        `command handler for ${command.type} does not exist`
-      );
+      assert(commandHandler, `command handler for ${command.type} does not exist`);
 
       const generatedEvent = await commandHandler.handle(
         {
@@ -135,40 +129,30 @@ export class AggregateInstance<
       );
 
       if (Array.isArray(generatedEvent)) {
-        const queue = new Queue();
-
-        for await (const _generatedEvent of generatedEvent) {
-          await queue.add(async () => {
-            const params = {
-              ..._generatedEvent,
-              aggregate: {
-                id: this._id,
-                version: this._version + 1,
-              },
-              meta: {},
-            };
-
-            const event = await this.client.insertEvent<TEvent>(params);
-
-            await this.digest([event]);
-          });
-        }
-
-        await queue.onIdle();
+        events = await this.client.insertEvents({
+          aggregate: {
+            id: this._id,
+            version: this._version + 1,
+          },
+          events: R.map((item) => ({
+            ...item,
+            meta: {},
+          }), generatedEvent)
+        });
       } else {
-        const params = {
+        const event = await this.client.insertEvent<TEvent>({
           ...generatedEvent,
           aggregate: {
             id: this._id,
             version: this._version + 1,
           },
           meta: {},
-        };
+        });
 
-        const event = await this.client.insertEvent<TEvent>(params);
-
-        await this.digest([event]);
+        events = [event];
       }
+
+      await this.digest(events);
 
       release();
     } catch (err) {
@@ -182,7 +166,7 @@ export class AggregateInstance<
     const release = await this.mutex.acquire();
 
     try {
-      let events = await this.client.listAggregateEvents({
+      const events = await this.client.listAggregateEvents({
         aggregate: {
           id: this._id,
           version: this._version,

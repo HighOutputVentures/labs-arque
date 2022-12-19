@@ -1,19 +1,19 @@
 {
   "compilerOptions": {
-      "target": "es5",
-      "lib": ["es6"],
-      "types": ["reflect-metadata", "node", "jest"],
-      "module": "commonjs",
-      "moduleResolution": "node",
-      "experimentalDecorators": true,
-      "emitDecoratorMetadata": true,
-      "esModuleInterop": true,
-      "allowSyntheticDefaultImports": true,
-      "importHelpers": true,
-      "skipLibCheck": true,
-      "skipDefaultLibCheck": true,
-      "sourceMap": true,
-      "declaration": false,
-      "allowJs": true
+    "target": "es5",
+    "lib": ["es6"],
+    "types": ["reflect-metadata", "node", "jest"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "importHelpers": true,
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "sourceMap": true,
+    "declaration": false,
+    "allowJs": true
   }
 }

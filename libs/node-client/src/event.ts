@@ -1,10 +1,6 @@
 import { ObjectId } from './object-id';
 
-export type Event<
-  TType extends number = number,
-  TBody extends {} = {},
-  TMeta extends {} = {},
-> = {
+export type Event<TType extends number = number, TBody extends {} = {}, TMeta extends {} = {}> = {
   id: ObjectId;
   type: TType;
   aggregate: {
@@ -14,11 +10,11 @@ export type Event<
   body: TBody;
   meta: TMeta;
   timestamp: Date;
-}
+};
 
 export type EventHandlerContext<TState, TContext extends {}> = TContext & { state: TState };
 
-export type EventHandler<TState, TContext extends {}> = {
+export type EventHandler<TEvent extends Event, TState, TContext extends {}> = {
   type: number;
-  handle(ctx: EventHandlerContext<TState, TContext>, event: Event): TState | Promise<TState>;
-}
+  handle(ctx: EventHandlerContext<TState, TContext>, event: TEvent): TState | Promise<TState>;
+};

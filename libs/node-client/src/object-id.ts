@@ -18,11 +18,11 @@ export class ObjectId {
 
       const increment = ObjectId.getIncrement();
 
-      const timestamp = new DataView(
-        buffer.buffer,
-        buffer.byteOffset,
-        buffer.length
-      ).setUint32(0, time, false);
+      const timestamp = new DataView(buffer.buffer, buffer.byteOffset, buffer.length).setUint32(
+        0,
+        time,
+        false
+      );
 
       buffer[4] = PROCESS_ID[0];
       buffer[5] = PROCESS_ID[1];

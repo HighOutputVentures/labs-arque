@@ -42,7 +42,9 @@ export class Arque {
     TEvent extends Event = Event,
     TState = unknown,
     TContext extends {} = {}
-  >(params: AggregateParams<TCommand, TEvent, TState, TContext>): Aggregate<TCommand, TEvent, TState, TContext> {
+  >(
+    params: AggregateParams<TCommand, TEvent, TState, TContext>
+  ): Aggregate<TCommand, TEvent, TState, TContext> {
     throw new Error('not implemented');
   }
 }

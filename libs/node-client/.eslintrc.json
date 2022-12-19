@@ -1,0 +1,15 @@
+{
+  "parser": "@typescript-eslint/parser",
+  "root": true,
+  "extends": ["airbnb-base", "airbnb-typescript/base"],
+  "plugins": ["@typescript-eslint"],
+  "overrides": [
+    {
+      "files": ["*.test.ts", "*.spec.ts"],
+      "env": {
+        "jest": true
+      },
+      "rules": {}
+    }
+  ]
+}

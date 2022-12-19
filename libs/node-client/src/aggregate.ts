@@ -13,7 +13,7 @@ export type AggregateOptions<
   commandHandlers: CommandHandler<TCommand, TEvent, TState, TContext>[];
   // preProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>;
   // postProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>;
-}
+};
 
 export class Aggregate<
   TCommand extends Command,

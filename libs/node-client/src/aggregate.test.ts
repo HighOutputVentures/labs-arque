@@ -1,2 +1,1 @@
-describe('Aggregate', () => {
-});
+describe('Aggregate', () => {});

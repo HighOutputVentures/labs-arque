@@ -5,7 +5,7 @@ export class InvalidAggregateVersionError extends Error {
   nextVersion: number;
   aggregate: ObjectId;
 
-  constructor(params: { aggregate: ObjectId, currentVersion: number, nextVersion: number }) {
+  constructor(params: { aggregate: ObjectId; currentVersion: number; nextVersion: number }) {
     super('invalid aggregate version');
 
     this.aggregate = params.aggregate;

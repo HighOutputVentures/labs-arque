@@ -4,11 +4,14 @@ import { ObjectId } from './object-id';
 import { TYPE } from './type';
 import 'reflect-metadata';
 
-export type InsertEventParams<
-  TType extends number = number,
-  TBody extends Record<string, any> = Record<string, any>,
-  TMeta extends Record<string, any> = Record<string, any>
-> = Pick<Event<TType, TBody, TMeta>, 'type' | 'aggregate' | 'body' | 'meta'>;
+export type InsertEventParams<TEvent extends Event> = Pick<
+  TEvent,
+  'type' | 'aggregate' | 'body' | 'meta'
+>;
+
+export type InsertEventsParams<TEvent extends Event> = Pick<TEvent, 'aggregate'> & {
+  events: Pick<TEvent, 'type' | 'body' | 'meta'>[];
+};
 
 export type ListAggregateEventsParams = {
   aggregate: {
@@ -24,8 +27,8 @@ export type ClientOptions = {
 
 @injectable()
 export class Client {
-  constructor(@inject(TYPE.ClientOptions) opts: ClientOptions) {
-    console.log({ opts });
+  constructor(@inject(TYPE.ClientOptions) _opts: ClientOptions) {
+    throw new Error('not implemented');
   }
 
   public async connect() {
@@ -36,11 +39,15 @@ export class Client {
     throw new Error('not implemented');
   }
 
-  public async insertEvent<
-    TEvent extends Event = Event,
-  >(
-    _params: InsertEventParams<TEvent['type'], TEvent['body'], TEvent['meta']>
+  public async insertEvent<TEvent extends Event = Event>(
+    _params: InsertEventParams<TEvent>
   ): Promise<TEvent> {
+    throw new Error('not implemented');
+  }
+
+  public async insertEvents<TEvent extends Event = Event>(
+    _params: InsertEventsParams<TEvent>
+  ): Promise<TEvent[]> {
     throw new Error('not implemented');
   }
 
