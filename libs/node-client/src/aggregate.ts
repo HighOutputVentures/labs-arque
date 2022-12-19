@@ -9,10 +9,10 @@ export type AggregateOptions<
   TState,
   TContext extends {}
 > = {
-  eventHandlers: EventHandler<TState, TContext>[];
+  eventHandlers: EventHandler<TEvent, TState, TContext>[];
   commandHandlers: CommandHandler<TCommand, TEvent, TState, TContext>[];
-  // preProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>;
-  // postProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>;
+  preProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>;
+  postProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>;
 };
 
 export class Aggregate<
@@ -25,7 +25,7 @@ export class Aggregate<
     throw new Error('not implemented');
   }
 
-  public async load(id: ObjectId): Promise<AggregateInstance<TCommand, TEvent, TState, TContext>> {
+  public async load(id: ObjectId, opts?: { reload?: boolean }): Promise<AggregateInstance<TCommand, TEvent, TState, TContext>> {
     throw new Error('not implemented');
   }
 }

@@ -1,0 +1,6 @@
+- [x] implement `AggregateInstance#reload`
+- [x] implement `AggregateInstance#process`
+- [ ] implement `Aggregate#load`
+- [ ] implement `preProcessHook` and `postProcessHook`
+- [ ] implement `Snapshot`
+- [ ] implement `Projection`
