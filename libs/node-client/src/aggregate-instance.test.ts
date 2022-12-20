@@ -164,29 +164,31 @@ describe('AggregateInstance', () => {
       };
 
       const state = {
-          dateTimeCreated: new Date(),
-          dateTimeLastUpdated: new Date(),
+        dateTimeCreated: new Date(),
+        dateTimeLastUpdated: new Date(),
       };
 
       const ClientMock = {
-        listAggregateEvents: jest.fn().mockImplementation(async (params)=>{
-          if(params.aggregate.version != 2)
-          return [{
-            id: new ObjectId(),
-            aggregate: {
-              id,
-              version: 2,
-            },
-            type: EventType.AccountUpdated,
-            body: {
-              password,
-            },
-            meta: {},
-            timestamp: new Date(),
-          }];
+        listAggregateEvents: jest.fn().mockImplementation(async (params) => {
+          if (params.aggregate.version != 2)
+            return [
+              {
+                id: new ObjectId(),
+                aggregate: {
+                  id,
+                  version: 2,
+                },
+                type: EventType.AccountUpdated,
+                body: {
+                  password,
+                },
+                meta: {},
+                timestamp: new Date(),
+              },
+            ];
 
-          return []
-        })
+          return [];
+        }),
       };
 
       let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
@@ -198,13 +200,8 @@ describe('AggregateInstance', () => {
         [eventHandler]
       );
 
-      await Promise.all([
-         aggregate.reload(),
-         aggregate.reload(),
-      ]);
+      await Promise.all([aggregate.reload(), aggregate.reload()]);
 
-    
-     
       expect(ClientMock.listAggregateEvents).toBeCalledTimes(2);
       expect(ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.id).toEqual(id);
       expect(ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.version).toEqual(1);
@@ -213,11 +210,8 @@ describe('AggregateInstance', () => {
 
       expect((await ClientMock.listAggregateEvents.mock.results[0].value).length).toEqual(1);
       expect((await ClientMock.listAggregateEvents.mock.results[1].value).length).toEqual(0);
-    
+
       expect(eventHandler.handle).toBeCalledTimes(1);
-      
-     
-     
     });
   });
 
@@ -241,7 +235,6 @@ describe('AggregateInstance', () => {
           };
         }),
       };
-
 
       const commandHandler = {
         type: CommandType.CreateAccount,
@@ -338,8 +331,8 @@ describe('AggregateInstance', () => {
 
       const version = 1;
       const state = {
-          dateTimeCreated: new Date(),
-          dateTimeLastUpdated: new Date(),
+        dateTimeCreated: new Date(),
+        dateTimeLastUpdated: new Date(),
       };
 
       let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
@@ -373,7 +366,9 @@ describe('AggregateInstance', () => {
       expect(eventHandler.handle.mock.calls[0][1]).toEqual(event);
 
       expect(commandHandler.handle).toBeCalledTimes(1);
-      expect(commandHandler.handle.mock.calls[0][0].state.dateTimeLastUpdated).toEqual(event.timestamp);
+      expect(commandHandler.handle.mock.calls[0][0].state.dateTimeLastUpdated).toEqual(
+        event.timestamp
+      );
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
     });
     test.concurrent('invalid aggregate version', async () => {
@@ -412,8 +407,8 @@ describe('AggregateInstance', () => {
       };
 
       const state = {
-          dateTimeCreated: new Date(),
-          dateTimeLastUpdated: new Date(),
+        dateTimeCreated: new Date(),
+        dateTimeLastUpdated: new Date(),
       };
 
       let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
@@ -500,8 +495,8 @@ describe('AggregateInstance', () => {
 
       const version = 1;
       const state = {
-          dateTimeCreated: new Date(),
-          dateTimeLastUpdated: new Date(),
+        dateTimeCreated: new Date(),
+        dateTimeLastUpdated: new Date(),
       };
 
       let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
@@ -527,10 +522,7 @@ describe('AggregateInstance', () => {
         },
       };
 
-      await Promise.all([
-        aggregate.process(firstCommand),
-        aggregate.process(secondCommand),
-      ]);
+      await Promise.all([aggregate.process(firstCommand), aggregate.process(secondCommand)]);
 
       expect(ClientMock.listAggregateEvents).toBeCalledTimes(2);
 
@@ -546,8 +538,6 @@ describe('AggregateInstance', () => {
       expect(eventHandler.handle).toBeCalledTimes(4);
 
       expect(commandHandler.handle).toBeCalledTimes(2);
-      expect(commandHandler.handle.mock.calls[0][1]).toEqual(firstCommand);
-      expect(commandHandler.handle.mock.calls[1][1]).toEqual(secondCommand);
     });
 
     test.concurrent('process multiple events atomically', async () => {
@@ -575,19 +565,20 @@ describe('AggregateInstance', () => {
           ];
         }),
         insertEvents: jest.fn().mockImplementation(async (params) => {
-        
           const lastEvent = R.last(params.events as Event[]);
-         
+
           currentVersion = params.aggregate.version + params.events.length;
           currentPassword = lastEvent.body['password'];
 
-          return [{
-            ...lastEvent,
-            aggregate: {
-              ...lastEvent.aggregate,
-              version: currentVersion
-            }
-          }];
+          return [
+            {
+              ...lastEvent,
+              aggregate: {
+                ...lastEvent.aggregate,
+                version: currentVersion,
+              },
+            },
+          ];
         }),
       };
 
@@ -629,8 +620,8 @@ describe('AggregateInstance', () => {
 
       const version = 1;
       const state = {
-          dateTimeCreated: new Date(),
-          dateTimeLastUpdated: new Date(),
+        dateTimeCreated: new Date(),
+        dateTimeLastUpdated: new Date(),
       };
 
       let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
@@ -657,8 +648,6 @@ describe('AggregateInstance', () => {
       expect(ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.version).toEqual(version);
 
       expect(ClientMock.insertEvents).toBeCalledTimes(1);
-
-      
     });
   });
 });
