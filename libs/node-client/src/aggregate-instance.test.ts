@@ -5,7 +5,7 @@ import { Event } from './event';
 import { faker } from '@faker-js/faker';
 import { hash } from 'bcrypt';
 import { InvalidAggregateVersionError } from './error';
-
+import R from 'ramda';
 describe('AggregateInstance', () => {
   type Account = {
     id: ObjectId;
@@ -118,28 +118,16 @@ describe('AggregateInstance', () => {
         type: EventType.AccountUpdated,
         handle: jest.fn(async (ctx, event: AccountUpdatedEvent) => {
           return {
-            root: {
-              ...ctx.state.root,
-              ...event.body,
-              dateTimeLastUpdated: event.timestamp,
-            },
+            ...ctx.state,
+            dateTimeLastUpdated: event.timestamp,
           };
         }),
       };
 
       const version = 1;
       const state = {
-        root: {
-          id,
-          name: faker.name.firstName().toLowerCase(),
-          password: await hash(faker.internet.password(), 10),
-          metadata: {
-            firstName: faker.name.firstName(),
-            lastName: faker.name.lastName(),
-          },
-          dateTimeCreated: new Date(),
-          dateTimeLastUpdated: new Date(),
-        },
+        dateTimeCreated: new Date(),
+        dateTimeLastUpdated: new Date(),
       };
 
       let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
@@ -163,37 +151,27 @@ describe('AggregateInstance', () => {
     test.concurrent('multiple concurrent execution', async () => {
       const id = new ObjectId();
       const password = await hash(faker.internet.password(), 10);
+      const currentVersion = 2;
 
       const eventHandler = {
         type: EventType.AccountUpdated,
         handle: jest.fn(async (ctx, event: AccountUpdatedEvent) => {
           return {
-            root: {
-              ...ctx.state.root,
-              ...event.body,
-              dateTimeLastUpdated: event.timestamp,
-            },
+            ...ctx.state,
+            dateTimeLastUpdated: event.timestamp,
           };
         }),
       };
 
       const state = {
-        root: {
-          id,
-          name: faker.name.firstName().toLowerCase(),
-          password: await hash(faker.internet.password(), 10),
-          metadata: {
-            firstName: faker.name.firstName(),
-            lastName: faker.name.lastName(),
-          },
           dateTimeCreated: new Date(),
           dateTimeLastUpdated: new Date(),
-        },
       };
 
       const ClientMock = {
-        listAggregateEvents: jest.fn().mockResolvedValue([
-          {
+        listAggregateEvents: jest.fn().mockImplementation(async (params)=>{
+          if(params.aggregate.version != 2)
+          return [{
             id: new ObjectId(),
             aggregate: {
               id,
@@ -205,74 +183,41 @@ describe('AggregateInstance', () => {
             },
             meta: {},
             timestamp: new Date(),
-          },
-        ]),
+          }];
+
+          return []
+        })
       };
 
-      const ClientMockV2 = {
-        listAggregateEvents: jest.fn().mockResolvedValue([
-          {
-            id: new ObjectId(),
-            aggregate: {
-              id,
-              version: 5,
-            },
-            type: EventType.AccountUpdated,
-            body: {
-              password,
-            },
-            meta: {},
-            timestamp: new Date(),
-          },
-        ]),
-      };
+      let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
+        id,
+        1,
+        state,
+        ClientMock as never,
+        [],
+        [eventHandler]
+      );
 
-      const [firstVersion, secondVersion] = await Promise.all([
-        (async () => {
-          let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
-            id,
-            1,
-            state,
-            ClientMock as never,
-            [],
-            [eventHandler]
-          );
-
-          await aggregate.reload();
-
-          return aggregate.version;
-        })(),
-
-        (async () => {
-          let aggregateV2 = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
-            id,
-            2,
-            state,
-            ClientMockV2 as never,
-            [],
-            [eventHandler]
-          );
-
-          await aggregateV2.reload();
-
-          return aggregateV2.version;
-        })(),
+      await Promise.all([
+         aggregate.reload(),
+         aggregate.reload(),
       ]);
 
-      expect(firstVersion).toBeLessThan(secondVersion);
-
-      expect(ClientMock.listAggregateEvents).toBeCalledTimes(1);
-
+    
+     
+      expect(ClientMock.listAggregateEvents).toBeCalledTimes(2);
       expect(ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.id).toEqual(id);
       expect(ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.version).toEqual(1);
+      expect(ClientMock.listAggregateEvents.mock.calls[1][0].aggregate.id).toEqual(id);
+      expect(ClientMock.listAggregateEvents.mock.calls[1][0].aggregate.version).toEqual(2);
 
-      expect(ClientMockV2.listAggregateEvents).toBeCalledTimes(1);
-
-      expect(ClientMockV2.listAggregateEvents.mock.calls[0][0].aggregate.id).toEqual(id);
-      expect(ClientMockV2.listAggregateEvents.mock.calls[0][0].aggregate.version).toEqual(2);
-
-      expect(eventHandler.handle).toBeCalledTimes(2);
-      expect(eventHandler.handle.mock.calls[0][0].state.root.id).toEqual(id);
+      expect((await ClientMock.listAggregateEvents.mock.results[0].value).length).toEqual(1);
+      expect((await ClientMock.listAggregateEvents.mock.results[1].value).length).toEqual(0);
+    
+      expect(eventHandler.handle).toBeCalledTimes(1);
+      
+     
+     
     });
   });
 
@@ -288,16 +233,15 @@ describe('AggregateInstance', () => {
 
       const eventHandler = {
         type: EventType.AccountCreated,
-        handle: jest.fn(async (ctx, event: AccountCreatedEvent) => {
+        handle: jest.fn(async (ctx, event: AccountUpdatedEvent) => {
           return {
-            root: {
-              ...(ctx.state ? ctx.state.root : {}),
-              ...event.body,
-              dateTimeLastUpdated: event.timestamp,
-            },
+            ...ctx.state,
+            ...event.body,
+            dateTimeLastUpdated: event.timestamp,
           };
         }),
       };
+
 
       const commandHandler = {
         type: CommandType.CreateAccount,
@@ -372,11 +316,8 @@ describe('AggregateInstance', () => {
         type: EventType.AccountUpdated,
         handle: jest.fn(async (ctx, event: AccountUpdatedEvent) => {
           return {
-            root: {
-              ...(ctx.state ? ctx.state.root : {}),
-              ...event.body,
-              dateTimeLastUpdated: event.timestamp,
-            },
+            ...ctx.state,
+            dateTimeLastUpdated: event.timestamp,
           };
         }),
       };
@@ -397,17 +338,8 @@ describe('AggregateInstance', () => {
 
       const version = 1;
       const state = {
-        root: {
-          id,
-          name: faker.name.firstName().toLowerCase(),
-          password: await hash(faker.internet.password(), 10),
-          metadata: {
-            firstName: faker.name.firstName(),
-            lastName: faker.name.lastName(),
-          },
           dateTimeCreated: new Date(),
           dateTimeLastUpdated: new Date(),
-        },
       };
 
       let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
@@ -424,10 +356,7 @@ describe('AggregateInstance', () => {
         params: {
           name: faker.name.firstName().toLowerCase(),
           password: await hash(faker.internet.password(), 10),
-          metadata: {
-            firstName: faker.name.firstName(),
-            lastName: faker.name.lastName(),
-          },
+          metadata: {},
         },
       };
 
@@ -441,11 +370,10 @@ describe('AggregateInstance', () => {
       expect(ClientMock.insertEvent).not.toBeCalled();
 
       expect(eventHandler.handle).toBeCalledTimes(1);
-      expect(eventHandler.handle.mock.calls[0][0].state.root.id).toEqual(id);
       expect(eventHandler.handle.mock.calls[0][1]).toEqual(event);
 
       expect(commandHandler.handle).toBeCalledTimes(1);
-      expect(commandHandler.handle.mock.calls[0][0].state.root.id).toEqual(id);
+      expect(commandHandler.handle.mock.calls[0][0].state.dateTimeLastUpdated).toEqual(event.timestamp);
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
     });
     test.concurrent('invalid aggregate version', async () => {
@@ -467,11 +395,8 @@ describe('AggregateInstance', () => {
         type: EventType.AccountUpdated,
         handle: jest.fn(async (ctx, event: AccountUpdatedEvent) => {
           return {
-            root: {
-              ...(ctx.state ? ctx.state.root : {}),
-              ...event.body,
-              dateTimeLastUpdated: event.timestamp,
-            },
+            ...ctx.state,
+            dateTimeLastUpdated: event.timestamp,
           };
         }),
       };
@@ -487,17 +412,8 @@ describe('AggregateInstance', () => {
       };
 
       const state = {
-        root: {
-          id,
-          name: faker.name.firstName().toLowerCase(),
-          password: await hash(faker.internet.password(), 10),
-          metadata: {
-            firstName: faker.name.firstName(),
-            lastName: faker.name.lastName(),
-          },
           dateTimeCreated: new Date(),
           dateTimeLastUpdated: new Date(),
-        },
       };
 
       let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
@@ -520,14 +436,13 @@ describe('AggregateInstance', () => {
       await expect(aggregate.process(command)).rejects.toThrow('invalid aggregate version');
 
       expect(ClientMock.listAggregateEvents).toBeCalledTimes(1);
-
       expect(ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.id).toEqual(id);
       expect(ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.version).toEqual(version);
 
       expect(eventHandler.handle).not.toBeCalled();
 
       expect(commandHandler.handle).toBeCalledTimes(1);
-      expect(commandHandler.handle.mock.calls[0][0].state.root.id).toEqual(id);
+      expect(commandHandler.handle.mock.calls[0][0].state).toEqual(state);
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
     });
 
@@ -567,11 +482,8 @@ describe('AggregateInstance', () => {
         type: EventType.AccountUpdated,
         handle: jest.fn(async (ctx, event: AccountUpdatedEvent) => {
           return {
-            root: {
-              ...(ctx.state ? ctx.state.root : {}),
-              ...event.body,
-              dateTimeLastUpdated: event.timestamp,
-            },
+            ...ctx.state,
+            dateTimeLastUpdated: event.timestamp,
           };
         }),
       };
@@ -588,17 +500,8 @@ describe('AggregateInstance', () => {
 
       const version = 1;
       const state = {
-        root: {
-          id,
-          name: faker.name.firstName().toLowerCase(),
-          password: currentPassword,
-          metadata: {
-            firstName: faker.name.firstName(),
-            lastName: faker.name.lastName(),
-          },
           dateTimeCreated: new Date(),
           dateTimeLastUpdated: new Date(),
-        },
       };
 
       let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
@@ -625,12 +528,8 @@ describe('AggregateInstance', () => {
       };
 
       await Promise.all([
-        (async () => {
-          await aggregate.process(firstCommand);
-        })(),
-        (async () => {
-          await aggregate.process(secondCommand);
-        })(),
+        aggregate.process(firstCommand),
+        aggregate.process(secondCommand),
       ]);
 
       expect(ClientMock.listAggregateEvents).toBeCalledTimes(2);
@@ -642,17 +541,12 @@ describe('AggregateInstance', () => {
       expect(ClientMock.listAggregateEvents.mock.calls[1][0].aggregate.version).toEqual(
         version + 1
       );
+      expect(ClientMock.insertEvent).toBeCalledTimes(2);
 
       expect(eventHandler.handle).toBeCalledTimes(4);
 
-      expect(ClientMock.insertEvent).toBeCalledTimes(2);
-
       expect(commandHandler.handle).toBeCalledTimes(2);
-
-      expect(commandHandler.handle.mock.calls[0][0].state.root.id).toEqual(id);
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(firstCommand);
-
-      expect(commandHandler.handle.mock.calls[1][0].state.root.id).toEqual(id);
       expect(commandHandler.handle.mock.calls[1][1]).toEqual(secondCommand);
     });
 
@@ -680,11 +574,20 @@ describe('AggregateInstance', () => {
             },
           ];
         }),
-        insertEvent: jest.fn().mockImplementation(async (event: Event) => {
-          currentVersion = event.aggregate.version;
-          currentPassword = event.body['password'];
+        insertEvents: jest.fn().mockImplementation(async (params) => {
+        
+          const lastEvent = R.last(params.events as Event[]);
+         
+          currentVersion = params.aggregate.version + params.events.length;
+          currentPassword = lastEvent.body['password'];
 
-          return event;
+          return [{
+            ...lastEvent,
+            aggregate: {
+              ...lastEvent.aggregate,
+              version: currentVersion
+            }
+          }];
         }),
       };
 
@@ -692,11 +595,8 @@ describe('AggregateInstance', () => {
         type: EventType.AccountUpdated,
         handle: jest.fn(async (ctx, event: AccountUpdatedEvent) => {
           return {
-            root: {
-              ...(ctx.state ? ctx.state.root : {}),
-              ...event.body,
-              dateTimeLastUpdated: event.timestamp,
-            },
+            ...ctx.state,
+            dateTimeLastUpdated: event.timestamp,
           };
         }),
       };
@@ -729,17 +629,8 @@ describe('AggregateInstance', () => {
 
       const version = 1;
       const state = {
-        root: {
-          id,
-          name: faker.name.firstName().toLowerCase(),
-          password: currentPassword,
-          metadata: {
-            firstName: faker.name.firstName(),
-            lastName: faker.name.lastName(),
-          },
           dateTimeCreated: new Date(),
           dateTimeLastUpdated: new Date(),
-        },
       };
 
       let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
@@ -751,25 +642,23 @@ describe('AggregateInstance', () => {
         [eventHandler]
       );
 
-      const firstCommand = {
+      const command = {
         type: CommandType.UpdateAccount,
         params: {
           password: await hash(faker.internet.password(), 10),
         },
       };
 
-      await aggregate.process(firstCommand);
+      await aggregate.process(command);
 
       expect(ClientMock.listAggregateEvents).toBeCalledTimes(1);
 
       expect(ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.id).toEqual(id);
       expect(ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.version).toEqual(version);
 
-      expect(ClientMock.insertEvent).toBeCalledTimes(2);
+      expect(ClientMock.insertEvents).toBeCalledTimes(1);
 
-      expect(ClientMock.insertEvent.mock.calls[0][0].body.metadata.version).toBeLessThan(
-        ClientMock.insertEvent.mock.calls[1][0].body.metadata.version
-      );
+      
     });
   });
 });
