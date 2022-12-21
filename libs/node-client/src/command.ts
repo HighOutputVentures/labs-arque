@@ -7,6 +7,8 @@ export type Command<TType extends number = number, TParams extends {} = {}> = {
 
 export type GeneratedEvent<TEvent extends Event> = Pick<TEvent, 'type' | 'body'>;
 
+export type CommandHandlerContext<TState, TContext extends {}> = TContext & { state: TState };
+
 export type CommandHandler<
   TCommand extends Command,
   TEvent extends Event,
@@ -15,7 +17,7 @@ export type CommandHandler<
 > = {
   type: number;
   handle(
-    ctx: TContext & { state: TState },
+    ctx: CommandHandlerContext<TState, TContext>,
     command: TCommand
   ):
     | GeneratedEvent<TEvent>

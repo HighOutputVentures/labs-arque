@@ -1,5 +1,5 @@
 import { Client } from './client';
-import { Command, CommandHandler } from './command';
+import { Command, CommandHandler, CommandHandlerContext } from './command';
 import { Event, EventHandler, EventHandlerContext } from './event';
 import { ObjectId } from './object-id';
 import { Mutex } from 'async-mutex';
@@ -20,6 +20,8 @@ export class AggregateInstance<
     new Map();
 
   private eventHandlers: Map<number, EventHandler<TEvent, TState, TContext>> = new Map();
+
+  private context: TContext;
 
   constructor(
     private _id: ObjectId,
@@ -62,8 +64,9 @@ export class AggregateInstance<
 
       const state = await eventHandler.handle(
         {
+          ...this.context,
           state: this._state,
-        } as EventHandlerContext<TState, TContext>,
+        },
         event
       );
 
@@ -110,10 +113,9 @@ export class AggregateInstance<
     const release = await this.mutex.acquire();
 
     try {
-      if (this.preProcessHook)
-        await this.preProcessHook({
-          state: this._state,
-        });
+      this.context = {} as TContext;
+
+      if (this.preProcessHook) await this.preProcessHook(this.context);
 
       let events = await this.client.listAggregateEvents<TEvent>({
         aggregate: {
@@ -130,8 +132,9 @@ export class AggregateInstance<
 
       const generatedEvent = await commandHandler.handle(
         {
+          ...this.context,
           state: this._state,
-        } as TContext & { state: TState },
+        } as CommandHandlerContext<TState, TContext>,
         command
       );
 
@@ -164,17 +167,13 @@ export class AggregateInstance<
 
       await this.digest(events);
 
-      if (this.postProcessHook)
-        await this.postProcessHook({
-          state: this._state,
-        });
+      this.context = { state: this._state } as EventHandlerContext<TState, TContext>;
+
+      if (this.postProcessHook) await this.postProcessHook(this.context);
 
       release();
     } catch (err) {
-      if (this.postProcessHook)
-        await this.postProcessHook({
-          state: this._state,
-        });
+      if (this.postProcessHook) await this.postProcessHook(this.context);
 
       release();
 
