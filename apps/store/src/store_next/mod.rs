@@ -5,17 +5,10 @@ use rocksdb::DBPinnableSlice;
 
 pub use rocksdb_store::RocksDBStore;
 
-custom_error! {pub StoreError
+custom_error! {
+    #[derive(PartialEq)]
+    pub StoreError
     InvalidAggregateVersion{current:u32, next:u32} = "invalid aggregate version: current={current},next={next}",
-    Unexpected{message:String} = "unexpected: {message}"
-}
-
-custom_error! {pub InsertEventError
-    InvalidAggregateVersion = "invalid aggregate version",
-    Unexpected{message:String} = "unexpected: {message}"
-}
-
-custom_error! {pub ListAggregateEventsError
     Unexpected{message:String} = "unexpected: {message}"
 }
 
@@ -33,7 +26,11 @@ pub struct ListAggregateEventsParams<'a> {
 }
 
 pub struct Event<'a> {
-    buf: DBPinnableSlice<'a>,
+    pub id: Vec<u8>,
+    pub type_: u16,
+    pub aggregate_id: Vec<u8>,
+    pub aggregate_version: u32,
+    pub data: DBPinnableSlice<'a>,
 }
 
 pub trait Store {
@@ -41,5 +38,5 @@ pub trait Store {
     fn list_aggregate_events(
         &self,
         params: &ListAggregateEventsParams,
-    ) -> Result<Vec<Event>, ListAggregateEventsError>;
+    ) -> Result<Vec<Event>, StoreError>;
 }

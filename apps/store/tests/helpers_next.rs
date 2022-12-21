@@ -1,7 +1,4 @@
-use arque_common::{
-    object_id::ObjectId,
-    request_generated::{Event, EventArgs},
-};
+use arque_common::request_generated::{Event, EventArgs};
 use flatbuffers::{FlatBufferBuilder, WIPOffset};
 use std::iter::repeat_with;
 
