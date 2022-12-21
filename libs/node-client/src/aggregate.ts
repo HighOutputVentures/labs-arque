@@ -30,7 +30,7 @@ export class Aggregate<
     this.cache = new LRUCache<string, AggregateInstance<TCommand, TEvent, TState, TContext>>(
       Object.freeze({
         max: 1024,
-        maxAge: 1800000,
+        ttl: 1800000,
       })
     );
   }
@@ -48,7 +48,9 @@ export class Aggregate<
         null,
         this.client,
         this.opts.commandHandlers,
-        this.opts.eventHandlers
+        this.opts.eventHandlers,
+        this.opts.preProcessHook,
+        this.opts.postProcessHook
       );
       this.cache.set(id.toString(), aggregateInstance);
     }

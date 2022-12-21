@@ -27,7 +27,9 @@ export class AggregateInstance<
     private _state: TState,
     private client: Client,
     commandHandlers: CommandHandler<TCommand, TEvent, TState, TContext>[],
-    eventHandlers: EventHandler<TEvent, TState, TContext>[]
+    eventHandlers: EventHandler<TEvent, TState, TContext>[],
+    private preProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>,
+    private postProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>
   ) {
     this.mutex = new Mutex();
 
@@ -108,6 +110,11 @@ export class AggregateInstance<
     const release = await this.mutex.acquire();
 
     try {
+      if (this.preProcessHook)
+        await this.preProcessHook({
+          state: this._state,
+        });
+
       let events = await this.client.listAggregateEvents<TEvent>({
         aggregate: {
           id: this._id,
@@ -134,10 +141,13 @@ export class AggregateInstance<
             id: this._id,
             version: this._version + 1,
           },
-          events: R.map((item) => ({
-            ...item,
-            meta: {},
-          }), generatedEvent)
+          events: R.map(
+            (item) => ({
+              ...item,
+              meta: {},
+            }),
+            generatedEvent
+          ),
         });
       } else {
         const event = await this.client.insertEvent<TEvent>({
@@ -154,8 +164,18 @@ export class AggregateInstance<
 
       await this.digest(events);
 
+      if (this.postProcessHook)
+        await this.postProcessHook({
+          state: this._state,
+        });
+
       release();
     } catch (err) {
+      if (this.postProcessHook)
+        await this.postProcessHook({
+          state: this._state,
+        });
+
       release();
 
       throw err;
