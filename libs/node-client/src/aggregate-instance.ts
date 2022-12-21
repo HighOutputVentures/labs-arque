@@ -57,21 +57,21 @@ export class AggregateInstance<
   }
 
   private async digest(events: TEvent[]) {
+    this.context = { ...this.context, state: this._state };
+
     for (const event of events) {
       const eventHandler = this.eventHandlers.get(event.type);
 
       assert(eventHandler, `event handler for ${event.type} does not exist`);
 
       const state = await eventHandler.handle(
-        {
-          ...this.context,
-          state: this._state,
-        },
+        this.context as EventHandlerContext<TState, TContext>,
         event
       );
 
       this._state = state;
       this._version = event.aggregate.version;
+      this.context = { ...this.context, state };
     }
   }
 
@@ -131,10 +131,7 @@ export class AggregateInstance<
       assert(commandHandler, `command handler for ${command.type} does not exist`);
 
       const generatedEvent = await commandHandler.handle(
-        {
-          ...this.context,
-          state: this._state,
-        } as CommandHandlerContext<TState, TContext>,
+        this.context as CommandHandlerContext<TState, TContext>,
         command
       );
 
@@ -166,8 +163,6 @@ export class AggregateInstance<
       }
 
       await this.digest(events);
-
-      this.context = { state: this._state } as EventHandlerContext<TState, TContext>;
 
       if (this.postProcessHook) await this.postProcessHook(this.context);
 
