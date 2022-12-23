@@ -4,6 +4,8 @@ import { Event, EventHandler } from './event';
 import { ObjectId } from './object-id';
 import LRUCache from 'lru-cache';
 import { Client } from './client';
+import { Context } from './common';
+
 export type AggregateOptions<
   TCommand extends Command,
   TEvent extends Event,
@@ -12,8 +14,8 @@ export type AggregateOptions<
 > = {
   eventHandlers: EventHandler<TEvent, TState, TContext>[];
   commandHandlers: CommandHandler<TCommand, TEvent, TState, TContext>[];
-  preProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>;
-  postProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>;
+  preProcessHook?: (ctx: Context<TState, TContext>) => void | Promise<void>;
+  postProcessHook?: (ctx: Context<TState, TContext>) => void | Promise<void>;
 };
 
 export class Aggregate<

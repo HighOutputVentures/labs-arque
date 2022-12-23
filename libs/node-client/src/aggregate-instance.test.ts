@@ -219,6 +219,7 @@ describe('AggregateInstance', () => {
     // should concurrent
     test.concurrent('process a command', async () => {
       const id = new ObjectId();
+      const version = 0;
 
       const ClientMock = {
         listAggregateEvents: jest.fn().mockResolvedValue([]),
@@ -249,8 +250,6 @@ describe('AggregateInstance', () => {
           };
         }),
       };
-
-      const version = 0;
 
       let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
         id,
@@ -284,8 +283,10 @@ describe('AggregateInstance', () => {
       expect(commandHandler.handle.mock.calls[0][0].state).toBeNull();
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
     });
+
     test.concurrent('invalid command', async () => {
       const id = new ObjectId();
+      const version = 1;
       const event = {
         id: new ObjectId(),
         aggregate: {
@@ -329,7 +330,6 @@ describe('AggregateInstance', () => {
         }),
       };
 
-      const version = 1;
       const state = {
         dateTimeCreated: new Date(),
         dateTimeLastUpdated: new Date(),
@@ -371,6 +371,7 @@ describe('AggregateInstance', () => {
       );
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
     });
+
     test.concurrent('invalid aggregate version', async () => {
       const id = new ObjectId();
       const version = 2;
@@ -433,9 +434,7 @@ describe('AggregateInstance', () => {
       expect(ClientMock.listAggregateEvents).toBeCalledTimes(1);
       expect(ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.id).toEqual(id);
       expect(ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.version).toEqual(version);
-
       expect(eventHandler.handle).not.toBeCalled();
-
       expect(commandHandler.handle).toBeCalledTimes(1);
       expect(commandHandler.handle.mock.calls[0][0].state).toEqual(state);
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
@@ -650,8 +649,9 @@ describe('AggregateInstance', () => {
       expect(ClientMock.insertEvents).toBeCalledTimes(1);
     });
 
-    test.concurrent('preProcess hook', async () => {
+    test.concurrent.only('preProcess hook', async () => {
       const id = new ObjectId();
+      const data = faker.datatype.string(1024);
 
       const ClientMock = {
         listAggregateEvents: jest.fn().mockResolvedValue([]),
@@ -685,7 +685,10 @@ describe('AggregateInstance', () => {
 
       const version = 0;
 
-      const preProcessHook = jest.fn();
+      const preProcessHook = jest.fn(async (ctx) => {
+        console.log(ctx.state);
+        ctx.data = data;
+      });
 
       let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
         id,

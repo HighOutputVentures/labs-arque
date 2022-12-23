@@ -1,12 +1,13 @@
 import { Client } from './client';
-import { Command, CommandHandler, CommandHandlerContext } from './command';
-import { Event, EventHandler, EventHandlerContext } from './event';
+import { Command, CommandHandler } from './command';
+import { Event, EventHandler } from './event';
 import { ObjectId } from './object-id';
 import { Mutex } from 'async-mutex';
 import assert from 'assert';
 import { Backoff, FibonacciStrategy } from 'backoff';
 import { InvalidAggregateVersionError } from './error';
 import R from 'ramda';
+import { Context } from './common';
 
 export class AggregateInstance<
   TCommand extends Command,
@@ -21,8 +22,6 @@ export class AggregateInstance<
 
   private eventHandlers: Map<number, EventHandler<TEvent, TState, TContext>> = new Map();
 
-  private context: TContext;
-
   constructor(
     private _id: ObjectId,
     private _version: number,
@@ -30,8 +29,8 @@ export class AggregateInstance<
     private client: Client,
     commandHandlers: CommandHandler<TCommand, TEvent, TState, TContext>[],
     eventHandlers: EventHandler<TEvent, TState, TContext>[],
-    private preProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>,
-    private postProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>
+    private preProcessHook?: (ctx: Context<TState, TContext>) => void | Promise<void>,
+    private postProcessHook?: (ctx: Context<TState, TContext>) => void | Promise<void>
   ) {
     this.mutex = new Mutex();
 
@@ -56,22 +55,16 @@ export class AggregateInstance<
     return this._state;
   }
 
-  private async digest(events: TEvent[]) {
-    this.context = { ...this.context, state: this._state };
-
+  private async digest(ctx: Context<TState, TContext>, events: TEvent[]) {
     for (const event of events) {
       const eventHandler = this.eventHandlers.get(event.type);
 
       assert(eventHandler, `event handler for ${event.type} does not exist`);
 
-      const state = await eventHandler.handle(
-        this.context as EventHandlerContext<TState, TContext>,
-        event
-      );
+      const state = await eventHandler.handle(ctx, event);
 
       this._state = state;
       this._version = event.aggregate.version;
-      this.context = { ...this.context, state };
     }
   }
 
@@ -110,12 +103,19 @@ export class AggregateInstance<
   }
 
   private async processCommand(command: TCommand): Promise<void> {
+    const ctx = {
+      get state(): TState {
+        return this._state;
+      },
+      get version(): number {
+        return this._version;
+      }
+    } as Context<TState, TContext>;
+
     const release = await this.mutex.acquire();
 
     try {
-      this.context = {} as TContext;
-
-      if (this.preProcessHook) await this.preProcessHook(this.context);
+      if (this.preProcessHook) await this.preProcessHook(ctx);
 
       let events = await this.client.listAggregateEvents<TEvent>({
         aggregate: {
@@ -124,14 +124,14 @@ export class AggregateInstance<
         },
       });
 
-      await this.digest(events);
+      await this.digest(ctx, events);
 
       const commandHandler = this.commandHandlers.get(command.type);
 
       assert(commandHandler, `command handler for ${command.type} does not exist`);
 
       const generatedEvent = await commandHandler.handle(
-        this.context as CommandHandlerContext<TState, TContext>,
+        ctx,
         command
       );
 
@@ -162,13 +162,13 @@ export class AggregateInstance<
         events = [event];
       }
 
-      await this.digest(events);
+      await this.digest(ctx, events);
 
-      if (this.postProcessHook) await this.postProcessHook(this.context);
+      if (this.postProcessHook) await this.postProcessHook(ctx);
 
       release();
     } catch (err) {
-      if (this.postProcessHook) await this.postProcessHook(this.context);
+      if (this.postProcessHook) await this.postProcessHook(ctx);
 
       release();
 
@@ -177,6 +177,15 @@ export class AggregateInstance<
   }
 
   public async reload(): Promise<void> {
+    const ctx = {
+      get state(): TState {
+        return this._state;
+      },
+      get version(): number {
+        return this._version;
+      }
+    } as Context<TState, TContext>;
+
     const release = await this.mutex.acquire();
 
     try {
@@ -187,7 +196,7 @@ export class AggregateInstance<
         },
       });
 
-      await this.digest(events as TEvent[]);
+      await this.digest(ctx, events as TEvent[]);
 
       release();
     } catch (err) {

@@ -1,3 +1,4 @@
+import { Context } from './common';
 import { ObjectId } from './object-id';
 
 export type Event<TType extends number = number, TBody extends {} = {}, TMeta extends {} = {}> = {
@@ -12,9 +13,7 @@ export type Event<TType extends number = number, TBody extends {} = {}, TMeta ex
   timestamp: Date;
 };
 
-export type EventHandlerContext<TState, TContext extends {}> = TContext & { state: TState };
-
 export type EventHandler<TEvent extends Event, TState, TContext extends {}> = {
   type: number;
-  handle(ctx: EventHandlerContext<TState, TContext>, event: TEvent): TState | Promise<TState>;
+  handle(ctx: Context<TState, TContext>, event: TEvent): TState | Promise<TState>;
 };
