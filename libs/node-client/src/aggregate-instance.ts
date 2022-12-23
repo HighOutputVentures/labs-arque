@@ -1,5 +1,5 @@
 import { Client } from './client';
-import { Command, CommandHandler } from './command';
+import { Command, CommandHandler, CommandHandlerContext } from './command';
 import { Event, EventHandler, EventHandlerContext } from './event';
 import { ObjectId } from './object-id';
 import { Mutex } from 'async-mutex';
@@ -21,13 +21,17 @@ export class AggregateInstance<
 
   private eventHandlers: Map<number, EventHandler<TEvent, TState, TContext>> = new Map();
 
+  private context: TContext;
+
   constructor(
     private _id: ObjectId,
     private _version: number,
     private _state: TState,
     private client: Client,
     commandHandlers: CommandHandler<TCommand, TEvent, TState, TContext>[],
-    eventHandlers: EventHandler<TEvent, TState, TContext>[]
+    eventHandlers: EventHandler<TEvent, TState, TContext>[],
+    private preProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>,
+    private postProcessHook?: <TContext extends {} = {}>(ctx: TContext) => void | Promise<void>
   ) {
     this.mutex = new Mutex();
 
@@ -53,20 +57,21 @@ export class AggregateInstance<
   }
 
   private async digest(events: TEvent[]) {
+    this.context = { ...this.context, state: this._state };
+
     for (const event of events) {
       const eventHandler = this.eventHandlers.get(event.type);
 
       assert(eventHandler, `event handler for ${event.type} does not exist`);
 
       const state = await eventHandler.handle(
-        {
-          state: this._state,
-        } as EventHandlerContext<TState, TContext>,
+        this.context as EventHandlerContext<TState, TContext>,
         event
       );
 
       this._state = state;
       this._version = event.aggregate.version;
+      this.context = { ...this.context, state };
     }
   }
 
@@ -108,6 +113,10 @@ export class AggregateInstance<
     const release = await this.mutex.acquire();
 
     try {
+      this.context = {} as TContext;
+
+      if (this.preProcessHook) await this.preProcessHook(this.context);
+
       let events = await this.client.listAggregateEvents<TEvent>({
         aggregate: {
           id: this._id,
@@ -122,9 +131,7 @@ export class AggregateInstance<
       assert(commandHandler, `command handler for ${command.type} does not exist`);
 
       const generatedEvent = await commandHandler.handle(
-        {
-          state: this._state,
-        } as TContext & { state: TState },
+        this.context as CommandHandlerContext<TState, TContext>,
         command
       );
 
@@ -134,10 +141,13 @@ export class AggregateInstance<
             id: this._id,
             version: this._version + 1,
           },
-          events: R.map((item) => ({
-            ...item,
-            meta: {},
-          }), generatedEvent)
+          events: R.map(
+            (item) => ({
+              ...item,
+              meta: {},
+            }),
+            generatedEvent
+          ),
         });
       } else {
         const event = await this.client.insertEvent<TEvent>({
@@ -154,8 +164,12 @@ export class AggregateInstance<
 
       await this.digest(events);
 
+      if (this.postProcessHook) await this.postProcessHook(this.context);
+
       release();
     } catch (err) {
+      if (this.postProcessHook) await this.postProcessHook(this.context);
+
       release();
 
       throw err;

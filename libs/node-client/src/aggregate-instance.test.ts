@@ -649,5 +649,152 @@ describe('AggregateInstance', () => {
 
       expect(ClientMock.insertEvents).toBeCalledTimes(1);
     });
+
+    test.concurrent('preProcess hook', async () => {
+      const id = new ObjectId();
+
+      const ClientMock = {
+        listAggregateEvents: jest.fn().mockResolvedValue([]),
+        insertEvent: jest.fn().mockImplementation(async (params) => params),
+      };
+
+      const eventHandler = {
+        type: EventType.AccountCreated,
+        handle: jest.fn(async (ctx, event: AccountUpdatedEvent) => {
+          return {
+            ...ctx.state,
+            ...event.body,
+            dateTimeLastUpdated: event.timestamp,
+          };
+        }),
+      };
+
+      const commandHandler = {
+        type: CommandType.CreateAccount,
+        handle: jest.fn(async (ctx, command: CreateAccountCommand) => {
+          if (ctx.state) {
+            throw new Error('account already exists');
+          }
+
+          return {
+            type: EventType.AccountCreated,
+            body: command.params,
+          };
+        }),
+      };
+
+      const version = 0;
+
+      const preProcessHook = jest.fn();
+
+      let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
+        id,
+        version,
+        null,
+        ClientMock as never,
+        [commandHandler],
+        [eventHandler],
+        preProcessHook
+      );
+
+      const command = {
+        type: CommandType.CreateAccount,
+        params: {
+          name: faker.name.firstName().toLowerCase(),
+          password: await hash(faker.internet.password(), 10),
+          metadata: {
+            firstName: faker.name.firstName(),
+            lastName: faker.name.lastName(),
+          },
+        },
+      };
+
+      await aggregate.process(command);
+
+      expect(ClientMock.listAggregateEvents).toBeCalledTimes(1);
+      expect(ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.id).toEqual(id);
+      expect(ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.version).toEqual(version);
+      expect(eventHandler.handle).toBeCalledTimes(1);
+      expect(ClientMock.insertEvent).toBeCalledTimes(1);
+      expect(commandHandler.handle).toBeCalledTimes(1);
+      expect(commandHandler.handle.mock.calls[0][0].state).toBeNull();
+      expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
+
+      expect(preProcessHook).toBeCalledTimes(1);
+    });
+
+    test.concurrent('postProcess hook', async () => {
+      const id = new ObjectId();
+
+      const ClientMock = {
+        listAggregateEvents: jest.fn().mockResolvedValue([]),
+        insertEvent: jest.fn().mockImplementation(async (params) => params),
+      };
+
+      const eventHandler = {
+        type: EventType.AccountCreated,
+        handle: jest.fn(async (ctx, event: AccountUpdatedEvent) => {
+          return {
+            ...ctx.state,
+            ...event.body,
+            dateTimeLastUpdated: event.timestamp,
+          };
+        }),
+      };
+
+      const commandHandler = {
+        type: CommandType.CreateAccount,
+        handle: jest.fn(async (ctx, command: CreateAccountCommand) => {
+          if (ctx.state) {
+            throw new Error('account already exists');
+          }
+
+          return {
+            type: EventType.AccountCreated,
+            body: command.params,
+          };
+        }),
+      };
+
+      const version = 0;
+
+      const postProcessHook = jest.fn();
+
+      let aggregate = new AggregateInstance<Command, Event, AccountAggregateState, {}>(
+        id,
+        version,
+        null,
+        ClientMock as never,
+        [commandHandler],
+        [eventHandler],
+        null,
+        postProcessHook
+      );
+
+      const command = {
+        type: CommandType.CreateAccount,
+        params: {
+          name: faker.name.firstName().toLowerCase(),
+          password: await hash(faker.internet.password(), 10),
+          metadata: {
+            firstName: faker.name.firstName(),
+            lastName: faker.name.lastName(),
+          },
+        },
+      };
+
+      await aggregate.process(command);
+
+      expect(ClientMock.listAggregateEvents).toBeCalledTimes(1);
+      expect(ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.id).toEqual(id);
+      expect(ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.version).toEqual(version);
+      expect(eventHandler.handle).toBeCalledTimes(1);
+      expect(ClientMock.insertEvent).toBeCalledTimes(1);
+      expect(commandHandler.handle).toBeCalledTimes(1);
+      expect(commandHandler.handle.mock.calls[0][0].state).toBeNull();
+      expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
+
+      expect(postProcessHook).toBeCalledTimes(1);
+    });
   });
 });
