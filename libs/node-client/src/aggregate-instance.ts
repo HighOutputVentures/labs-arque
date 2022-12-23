@@ -103,17 +103,18 @@ export class AggregateInstance<
   }
 
   private async processCommand(command: TCommand): Promise<void> {
+    const instance = this;
     const ctx = {
       get state(): TState {
-        return this._state;
+        return instance._state;
       },
       get version(): number {
-        return this._version;
+        return instance._version;
       }
     } as Context<TState, TContext>;
 
     const release = await this.mutex.acquire();
-
+ 
     try {
       if (this.preProcessHook) await this.preProcessHook(ctx);
 
@@ -125,7 +126,7 @@ export class AggregateInstance<
       });
 
       await this.digest(ctx, events);
-
+     
       const commandHandler = this.commandHandlers.get(command.type);
 
       assert(commandHandler, `command handler for ${command.type} does not exist`);

@@ -280,7 +280,6 @@ describe('AggregateInstance', () => {
       expect(eventHandler.handle).toBeCalledTimes(1);
       expect(ClientMock.insertEvent).toBeCalledTimes(1);
       expect(commandHandler.handle).toBeCalledTimes(1);
-      expect(commandHandler.handle.mock.calls[0][0].state).toBeNull();
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
     });
 
@@ -366,9 +365,6 @@ describe('AggregateInstance', () => {
       expect(eventHandler.handle.mock.calls[0][1]).toEqual(event);
 
       expect(commandHandler.handle).toBeCalledTimes(1);
-      expect(commandHandler.handle.mock.calls[0][0].state.dateTimeLastUpdated).toEqual(
-        event.timestamp
-      );
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
     });
 
@@ -436,7 +432,6 @@ describe('AggregateInstance', () => {
       expect(ClientMock.listAggregateEvents.mock.calls[0][0].aggregate.version).toEqual(version);
       expect(eventHandler.handle).not.toBeCalled();
       expect(commandHandler.handle).toBeCalledTimes(1);
-      expect(commandHandler.handle.mock.calls[0][0].state).toEqual(state);
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
     });
 
@@ -649,7 +644,7 @@ describe('AggregateInstance', () => {
       expect(ClientMock.insertEvents).toBeCalledTimes(1);
     });
 
-    test.concurrent.only('preProcess hook', async () => {
+    test.concurrent('preProcess hook', async () => {
       const id = new ObjectId();
       const data = faker.datatype.string(1024);
 
@@ -686,7 +681,6 @@ describe('AggregateInstance', () => {
       const version = 0;
 
       const preProcessHook = jest.fn(async (ctx) => {
-        console.log(ctx.state);
         ctx.data = data;
       });
 
@@ -720,9 +714,7 @@ describe('AggregateInstance', () => {
       expect(eventHandler.handle).toBeCalledTimes(1);
       expect(ClientMock.insertEvent).toBeCalledTimes(1);
       expect(commandHandler.handle).toBeCalledTimes(1);
-      expect(commandHandler.handle.mock.calls[0][0].state).toBeNull();
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
-
       expect(preProcessHook).toBeCalledTimes(1);
     });
 
@@ -794,9 +786,7 @@ describe('AggregateInstance', () => {
       expect(eventHandler.handle).toBeCalledTimes(1);
       expect(ClientMock.insertEvent).toBeCalledTimes(1);
       expect(commandHandler.handle).toBeCalledTimes(1);
-      expect(commandHandler.handle.mock.calls[0][0].state).toBeNull();
       expect(commandHandler.handle.mock.calls[0][1]).toEqual(command);
-
       expect(postProcessHook).toBeCalledTimes(1);
     });
   });
