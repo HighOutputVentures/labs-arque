@@ -1,17 +1,28 @@
-table Event {
+table InsertEventsRequestBodyEvent {
+  id:[ubyte];
+  type:uint16;
+  body:[ubyte];
+  meta:[ubyte];
+}
+
+table InsertEventRequestBody {
   id:[ubyte];
   type:uint16;
   aggregate_id:[ubyte];
   aggregate_version:uint32;
   body:[ubyte];
   meta:[ubyte];
+  timestamp:uint32;
 }
 
-table InsertEventRequestBody {
-  event:Event;
+table InsertEventsRequestBody {
+  aggregate_id:[ubyte];
+  aggregate_version:uint32;
+  timestamp:uint32;
+  events:[InsertEventsRequestBodyEvent];
 }
 
-table ListAggregateEventsRequestBody {
+table ListEventsRequestBody {
   aggregate_id:[ubyte];
   aggregate_version:uint32;
   limit:uint32;
@@ -19,7 +30,7 @@ table ListAggregateEventsRequestBody {
 
 union RequestBody {
   InsertEvent:InsertEventRequestBody,
-  ListAggregateEvents:ListAggregateEventsRequestBody
+  ListEvents:ListEventsRequestBody,
 }
 
 table Request {

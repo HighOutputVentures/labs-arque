@@ -5,6 +5,7 @@ table Event {
   aggregate_version:uint32;
   body:[ubyte];
   meta:[ubyte];
+  timestamp:uint32;
 }
 
 root_type Event;

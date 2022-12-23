@@ -14,6 +14,7 @@ pub enum EventOffset {}
 
 pub struct Event<'a> {
   pub _tab: flatbuffers::Table<'a>,
+pub(crate) buf: Vec<u8>,
 }
 
 impl<'a> flatbuffers::Follow<'a> for Event<'a> {
@@ -31,6 +32,7 @@ impl<'a> Event<'a> {
   pub const VT_AGGREGATE_VERSION: flatbuffers::VOffsetT = 10;
   pub const VT_BODY: flatbuffers::VOffsetT = 12;
   pub const VT_META: flatbuffers::VOffsetT = 14;
+  pub const VT_TIMESTAMP: flatbuffers::VOffsetT = 16;
 
   #[inline]
   pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -42,6 +44,7 @@ impl<'a> Event<'a> {
     args: &'args EventArgs<'args>
   ) -> flatbuffers::WIPOffset<Event<'bldr>> {
     let mut builder = EventBuilder::new(_fbb);
+    builder.add_timestamp(args.timestamp);
     if let Some(x) = args.meta { builder.add_meta(x); }
     if let Some(x) = args.body { builder.add_body(x); }
     builder.add_aggregate_version(args.aggregate_version);
@@ -76,6 +79,10 @@ impl<'a> Event<'a> {
   pub fn meta(&self) -> Option<&'a [u8]> {
     self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(Event::VT_META, None).map(|v| v.safe_slice())
   }
+  #[inline]
+  pub fn timestamp(&self) -> u32 {
+    self._tab.get::<u32>(Event::VT_TIMESTAMP, Some(0)).unwrap()
+  }
 }
 
 impl flatbuffers::Verifiable for Event<'_> {
@@ -91,6 +98,7 @@ impl flatbuffers::Verifiable for Event<'_> {
      .visit_field::<u32>("aggregate_version", Self::VT_AGGREGATE_VERSION, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("body", Self::VT_BODY, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("meta", Self::VT_META, false)?
+     .visit_field::<u32>("timestamp", Self::VT_TIMESTAMP, false)?
      .finish();
     Ok(())
   }
@@ -102,6 +110,7 @@ pub struct EventArgs<'a> {
     pub aggregate_version: u32,
     pub body: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub meta: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub timestamp: u32,
 }
 impl<'a> Default for EventArgs<'a> {
   #[inline]
@@ -113,6 +122,7 @@ impl<'a> Default for EventArgs<'a> {
       aggregate_version: 0,
       body: None,
       meta: None,
+      timestamp: 0,
     }
   }
 }
@@ -147,6 +157,10 @@ impl<'a: 'b, 'b> EventBuilder<'a, 'b> {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Event::VT_META, meta);
   }
   #[inline]
+  pub fn add_timestamp(&mut self, timestamp: u32) {
+    self.fbb_.push_slot::<u32>(Event::VT_TIMESTAMP, timestamp, 0);
+  }
+  #[inline]
   pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> EventBuilder<'a, 'b> {
     let start = _fbb.start_table();
     EventBuilder {
@@ -170,6 +184,7 @@ impl core::fmt::Debug for Event<'_> {
       ds.field("aggregate_version", &self.aggregate_version());
       ds.field("body", &self.body());
       ds.field("meta", &self.meta());
+      ds.field("timestamp", &self.timestamp());
       ds.finish()
   }
 }

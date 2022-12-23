@@ -1,0 +1,22 @@
+[package]
+name = "arque_store"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+custom_error = "1.9"
+rocksdb = "0.19"
+byteorder = "1.4"
+arque_common = { path = "../../libs/common" }
+flatbuffers = "2.1"
+
+[dev-dependencies]
+rstest = "0.15"
+criterion = "0.3"
+fastrand = "1.8"
+tempdir = "0.3"
+
+[[bench]]
+name = "store_insert_event"
+harness = false
+

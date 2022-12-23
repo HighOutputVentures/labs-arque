@@ -12,11 +12,16 @@ static PROCESS_ID: Lazy<u32> = Lazy::new(|| (process::id() % 0xFFFF) as u32);
 static mut INDEX: Lazy<Mutex<u32>> =
     Lazy::new(|| Mutex::new((fastrand::f32() * 0xFFFFFF as f32).floor() as u32));
 
-pub struct ObjectId {
-    data: Vec<u8>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct EventId {
+    data: [u8;12],
 }
 
-impl ObjectId {
+impl Default for EventId {
+    fn default() -> Self { EventId::new() }
+}
+
+impl EventId {
     pub fn new() -> Self {
         let time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -32,7 +37,7 @@ impl ObjectId {
         };
 
         Self {
-            data: vec![
+            data: [
                 ((time >> 24) & 0xFF) as u8,
                 ((time >> 16) & 0xFF) as u8,
                 ((time >> 8) & 0xFF) as u8,
@@ -57,11 +62,8 @@ impl ObjectId {
         hex::encode(&self.data)
     }
 
-    pub fn timestamp(&self) -> u32 {
-        self.data[3] as u32
-            | (self.data[2] as u32) << 8
-            | (self.data[1] as u32) << 16
-            | (self.data[0] as u32) << 24
+    pub fn from_bytes(data: [u8;12]) -> Self {
+        EventId { data }
     }
 }
 
@@ -78,32 +80,31 @@ mod tests {
         let mut set = BTreeSet::new();
 
         for _n in 0..1000 {
-            let id = ObjectId::new();
-            set.insert(id.to_bytes().to_owned());
+            set.insert(EventId::new());
         }
 
-        assert_eq!(set.len(), 1000, "the items of the set should be unique");
+        assert_eq!(set.len(), 1000, "ids should be unique");
     }
 
     #[rstest]
     fn test_to_str() {
-        let id = ObjectId::new();
+        let id = EventId::new();
 
-        let re = Regex::new(r"^[0-9a-fA-F]{24}$").unwrap();
+        let regex = Regex::new(r"^[0-9a-fA-F]{24}$").unwrap();
         assert!(
-            re.is_match(id.to_string().as_str()),
-            "the object id string should match to the regex pattern"
+            regex.is_match(id.to_string().as_str()),
+            "id string should match the regex pattern"
         );
     }
 
     #[rstest]
     fn test_to_bytes() {
-        let id = ObjectId::new();
+        let id = EventId::new();
 
         assert_eq!(
             id.to_bytes().len(),
             12,
-            "the object id bytes length should be equal to 12"
+            "id bytes length should be equal to 12"
         );
     }
 }

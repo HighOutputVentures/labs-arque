@@ -18,7 +18,7 @@ pub const ENUM_MAX_REQUEST_BODY: u8 = 2;
 pub const ENUM_VALUES_REQUEST_BODY: [RequestBody; 3] = [
   RequestBody::NONE,
   RequestBody::InsertEvent,
-  RequestBody::ListAggregateEvents,
+  RequestBody::ListEvents,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -28,21 +28,21 @@ pub struct RequestBody(pub u8);
 impl RequestBody {
   pub const NONE: Self = Self(0);
   pub const InsertEvent: Self = Self(1);
-  pub const ListAggregateEvents: Self = Self(2);
+  pub const ListEvents: Self = Self(2);
 
   pub const ENUM_MIN: u8 = 0;
   pub const ENUM_MAX: u8 = 2;
   pub const ENUM_VALUES: &'static [Self] = &[
     Self::NONE,
     Self::InsertEvent,
-    Self::ListAggregateEvents,
+    Self::ListEvents,
   ];
   /// Returns the variant's name or "" if unknown.
   pub fn variant_name(self) -> Option<&'static str> {
     match self {
       Self::NONE => Some("NONE"),
       Self::InsertEvent => Some("InsertEvent"),
-      Self::ListAggregateEvents => Some("ListAggregateEvents"),
+      Self::ListEvents => Some("ListEvents"),
       _ => None,
     }
   }
@@ -102,43 +102,39 @@ impl<'a> flatbuffers::Verifiable for RequestBody {
 impl flatbuffers::SimpleToVerifyInSlice for RequestBody {}
 pub struct RequestBodyUnionTableOffset {}
 
-pub enum EventOffset {}
+pub enum InsertEventsRequestBodyEventOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
-pub struct Event<'a> {
+pub struct InsertEventsRequestBodyEvent<'a> {
   pub _tab: flatbuffers::Table<'a>,
 }
 
-impl<'a> flatbuffers::Follow<'a> for Event<'a> {
-  type Inner = Event<'a>;
+impl<'a> flatbuffers::Follow<'a> for InsertEventsRequestBodyEvent<'a> {
+  type Inner = InsertEventsRequestBodyEvent<'a>;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
     Self { _tab: flatbuffers::Table { buf, loc } }
   }
 }
 
-impl<'a> Event<'a> {
+impl<'a> InsertEventsRequestBodyEvent<'a> {
   pub const VT_ID: flatbuffers::VOffsetT = 4;
   pub const VT_TYPE_: flatbuffers::VOffsetT = 6;
-  pub const VT_AGGREGATE_ID: flatbuffers::VOffsetT = 8;
-  pub const VT_AGGREGATE_VERSION: flatbuffers::VOffsetT = 10;
-  pub const VT_BODY: flatbuffers::VOffsetT = 12;
-  pub const VT_META: flatbuffers::VOffsetT = 14;
+  pub const VT_BODY: flatbuffers::VOffsetT = 8;
+  pub const VT_META: flatbuffers::VOffsetT = 10;
 
   #[inline]
   pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-    Event { _tab: table }
+    InsertEventsRequestBodyEvent { _tab: table }
   }
   #[allow(unused_mut)]
   pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
     _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-    args: &'args EventArgs<'args>
-  ) -> flatbuffers::WIPOffset<Event<'bldr>> {
-    let mut builder = EventBuilder::new(_fbb);
+    args: &'args InsertEventsRequestBodyEventArgs<'args>
+  ) -> flatbuffers::WIPOffset<InsertEventsRequestBodyEvent<'bldr>> {
+    let mut builder = InsertEventsRequestBodyEventBuilder::new(_fbb);
     if let Some(x) = args.meta { builder.add_meta(x); }
     if let Some(x) = args.body { builder.add_body(x); }
-    builder.add_aggregate_version(args.aggregate_version);
-    if let Some(x) = args.aggregate_id { builder.add_aggregate_id(x); }
     if let Some(x) = args.id { builder.add_id(x); }
     builder.add_type_(args.type_);
     builder.finish()
@@ -147,31 +143,23 @@ impl<'a> Event<'a> {
 
   #[inline]
   pub fn id(&self) -> Option<&'a [u8]> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(Event::VT_ID, None).map(|v| v.safe_slice())
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(InsertEventsRequestBodyEvent::VT_ID, None).map(|v| v.safe_slice())
   }
   #[inline]
   pub fn type_(&self) -> u16 {
-    self._tab.get::<u16>(Event::VT_TYPE_, Some(0)).unwrap()
-  }
-  #[inline]
-  pub fn aggregate_id(&self) -> Option<&'a [u8]> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(Event::VT_AGGREGATE_ID, None).map(|v| v.safe_slice())
-  }
-  #[inline]
-  pub fn aggregate_version(&self) -> u32 {
-    self._tab.get::<u32>(Event::VT_AGGREGATE_VERSION, Some(0)).unwrap()
+    self._tab.get::<u16>(InsertEventsRequestBodyEvent::VT_TYPE_, Some(0)).unwrap()
   }
   #[inline]
   pub fn body(&self) -> Option<&'a [u8]> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(Event::VT_BODY, None).map(|v| v.safe_slice())
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(InsertEventsRequestBodyEvent::VT_BODY, None).map(|v| v.safe_slice())
   }
   #[inline]
   pub fn meta(&self) -> Option<&'a [u8]> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(Event::VT_META, None).map(|v| v.safe_slice())
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(InsertEventsRequestBodyEvent::VT_META, None).map(|v| v.safe_slice())
   }
 }
 
-impl flatbuffers::Verifiable for Event<'_> {
+impl flatbuffers::Verifiable for InsertEventsRequestBodyEvent<'_> {
   #[inline]
   fn run_verifier(
     v: &mut flatbuffers::Verifier, pos: usize
@@ -180,87 +168,71 @@ impl flatbuffers::Verifiable for Event<'_> {
     v.visit_table(pos)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("id", Self::VT_ID, false)?
      .visit_field::<u16>("type_", Self::VT_TYPE_, false)?
-     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("aggregate_id", Self::VT_AGGREGATE_ID, false)?
-     .visit_field::<u32>("aggregate_version", Self::VT_AGGREGATE_VERSION, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("body", Self::VT_BODY, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("meta", Self::VT_META, false)?
      .finish();
     Ok(())
   }
 }
-pub struct EventArgs<'a> {
+pub struct InsertEventsRequestBodyEventArgs<'a> {
     pub id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub type_: u16,
-    pub aggregate_id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
-    pub aggregate_version: u32,
     pub body: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub meta: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
 }
-impl<'a> Default for EventArgs<'a> {
+impl<'a> Default for InsertEventsRequestBodyEventArgs<'a> {
   #[inline]
   fn default() -> Self {
-    EventArgs {
+    InsertEventsRequestBodyEventArgs {
       id: None,
       type_: 0,
-      aggregate_id: None,
-      aggregate_version: 0,
       body: None,
       meta: None,
     }
   }
 }
 
-pub struct EventBuilder<'a: 'b, 'b> {
+pub struct InsertEventsRequestBodyEventBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> EventBuilder<'a, 'b> {
+impl<'a: 'b, 'b> InsertEventsRequestBodyEventBuilder<'a, 'b> {
   #[inline]
   pub fn add_id(&mut self, id: flatbuffers::WIPOffset<flatbuffers::Vector<'b , u8>>) {
-    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Event::VT_ID, id);
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(InsertEventsRequestBodyEvent::VT_ID, id);
   }
   #[inline]
   pub fn add_type_(&mut self, type_: u16) {
-    self.fbb_.push_slot::<u16>(Event::VT_TYPE_, type_, 0);
-  }
-  #[inline]
-  pub fn add_aggregate_id(&mut self, aggregate_id: flatbuffers::WIPOffset<flatbuffers::Vector<'b , u8>>) {
-    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Event::VT_AGGREGATE_ID, aggregate_id);
-  }
-  #[inline]
-  pub fn add_aggregate_version(&mut self, aggregate_version: u32) {
-    self.fbb_.push_slot::<u32>(Event::VT_AGGREGATE_VERSION, aggregate_version, 0);
+    self.fbb_.push_slot::<u16>(InsertEventsRequestBodyEvent::VT_TYPE_, type_, 0);
   }
   #[inline]
   pub fn add_body(&mut self, body: flatbuffers::WIPOffset<flatbuffers::Vector<'b , u8>>) {
-    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Event::VT_BODY, body);
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(InsertEventsRequestBodyEvent::VT_BODY, body);
   }
   #[inline]
   pub fn add_meta(&mut self, meta: flatbuffers::WIPOffset<flatbuffers::Vector<'b , u8>>) {
-    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Event::VT_META, meta);
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(InsertEventsRequestBodyEvent::VT_META, meta);
   }
   #[inline]
-  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> EventBuilder<'a, 'b> {
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> InsertEventsRequestBodyEventBuilder<'a, 'b> {
     let start = _fbb.start_table();
-    EventBuilder {
+    InsertEventsRequestBodyEventBuilder {
       fbb_: _fbb,
       start_: start,
     }
   }
   #[inline]
-  pub fn finish(self) -> flatbuffers::WIPOffset<Event<'a>> {
+  pub fn finish(self) -> flatbuffers::WIPOffset<InsertEventsRequestBodyEvent<'a>> {
     let o = self.fbb_.end_table(self.start_);
     flatbuffers::WIPOffset::new(o.value())
   }
 }
 
-impl core::fmt::Debug for Event<'_> {
+impl core::fmt::Debug for InsertEventsRequestBodyEvent<'_> {
   fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-    let mut ds = f.debug_struct("Event");
+    let mut ds = f.debug_struct("InsertEventsRequestBodyEvent");
       ds.field("id", &self.id());
       ds.field("type_", &self.type_());
-      ds.field("aggregate_id", &self.aggregate_id());
-      ds.field("aggregate_version", &self.aggregate_version());
       ds.field("body", &self.body());
       ds.field("meta", &self.meta());
       ds.finish()
@@ -282,7 +254,13 @@ impl<'a> flatbuffers::Follow<'a> for InsertEventRequestBody<'a> {
 }
 
 impl<'a> InsertEventRequestBody<'a> {
-  pub const VT_EVENT: flatbuffers::VOffsetT = 4;
+  pub const VT_ID: flatbuffers::VOffsetT = 4;
+  pub const VT_TYPE_: flatbuffers::VOffsetT = 6;
+  pub const VT_AGGREGATE_ID: flatbuffers::VOffsetT = 8;
+  pub const VT_AGGREGATE_VERSION: flatbuffers::VOffsetT = 10;
+  pub const VT_BODY: flatbuffers::VOffsetT = 12;
+  pub const VT_META: flatbuffers::VOffsetT = 14;
+  pub const VT_TIMESTAMP: flatbuffers::VOffsetT = 16;
 
   #[inline]
   pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -294,14 +272,44 @@ impl<'a> InsertEventRequestBody<'a> {
     args: &'args InsertEventRequestBodyArgs<'args>
   ) -> flatbuffers::WIPOffset<InsertEventRequestBody<'bldr>> {
     let mut builder = InsertEventRequestBodyBuilder::new(_fbb);
-    if let Some(x) = args.event { builder.add_event(x); }
+    builder.add_timestamp(args.timestamp);
+    if let Some(x) = args.meta { builder.add_meta(x); }
+    if let Some(x) = args.body { builder.add_body(x); }
+    builder.add_aggregate_version(args.aggregate_version);
+    if let Some(x) = args.aggregate_id { builder.add_aggregate_id(x); }
+    if let Some(x) = args.id { builder.add_id(x); }
+    builder.add_type_(args.type_);
     builder.finish()
   }
 
 
   #[inline]
-  pub fn event(&self) -> Option<Event<'a>> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<Event>>(InsertEventRequestBody::VT_EVENT, None)
+  pub fn id(&self) -> Option<&'a [u8]> {
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(InsertEventRequestBody::VT_ID, None).map(|v| v.safe_slice())
+  }
+  #[inline]
+  pub fn type_(&self) -> u16 {
+    self._tab.get::<u16>(InsertEventRequestBody::VT_TYPE_, Some(0)).unwrap()
+  }
+  #[inline]
+  pub fn aggregate_id(&self) -> Option<&'a [u8]> {
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(InsertEventRequestBody::VT_AGGREGATE_ID, None).map(|v| v.safe_slice())
+  }
+  #[inline]
+  pub fn aggregate_version(&self) -> u32 {
+    self._tab.get::<u32>(InsertEventRequestBody::VT_AGGREGATE_VERSION, Some(0)).unwrap()
+  }
+  #[inline]
+  pub fn body(&self) -> Option<&'a [u8]> {
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(InsertEventRequestBody::VT_BODY, None).map(|v| v.safe_slice())
+  }
+  #[inline]
+  pub fn meta(&self) -> Option<&'a [u8]> {
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(InsertEventRequestBody::VT_META, None).map(|v| v.safe_slice())
+  }
+  #[inline]
+  pub fn timestamp(&self) -> u32 {
+    self._tab.get::<u32>(InsertEventRequestBody::VT_TIMESTAMP, Some(0)).unwrap()
   }
 }
 
@@ -312,19 +320,37 @@ impl flatbuffers::Verifiable for InsertEventRequestBody<'_> {
   ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
     use self::flatbuffers::Verifiable;
     v.visit_table(pos)?
-     .visit_field::<flatbuffers::ForwardsUOffset<Event>>("event", Self::VT_EVENT, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("id", Self::VT_ID, false)?
+     .visit_field::<u16>("type_", Self::VT_TYPE_, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("aggregate_id", Self::VT_AGGREGATE_ID, false)?
+     .visit_field::<u32>("aggregate_version", Self::VT_AGGREGATE_VERSION, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("body", Self::VT_BODY, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("meta", Self::VT_META, false)?
+     .visit_field::<u32>("timestamp", Self::VT_TIMESTAMP, false)?
      .finish();
     Ok(())
   }
 }
 pub struct InsertEventRequestBodyArgs<'a> {
-    pub event: Option<flatbuffers::WIPOffset<Event<'a>>>,
+    pub id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub type_: u16,
+    pub aggregate_id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub aggregate_version: u32,
+    pub body: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub meta: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub timestamp: u32,
 }
 impl<'a> Default for InsertEventRequestBodyArgs<'a> {
   #[inline]
   fn default() -> Self {
     InsertEventRequestBodyArgs {
-      event: None,
+      id: None,
+      type_: 0,
+      aggregate_id: None,
+      aggregate_version: 0,
+      body: None,
+      meta: None,
+      timestamp: 0,
     }
   }
 }
@@ -335,8 +361,32 @@ pub struct InsertEventRequestBodyBuilder<'a: 'b, 'b> {
 }
 impl<'a: 'b, 'b> InsertEventRequestBodyBuilder<'a, 'b> {
   #[inline]
-  pub fn add_event(&mut self, event: flatbuffers::WIPOffset<Event<'b >>) {
-    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<Event>>(InsertEventRequestBody::VT_EVENT, event);
+  pub fn add_id(&mut self, id: flatbuffers::WIPOffset<flatbuffers::Vector<'b , u8>>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(InsertEventRequestBody::VT_ID, id);
+  }
+  #[inline]
+  pub fn add_type_(&mut self, type_: u16) {
+    self.fbb_.push_slot::<u16>(InsertEventRequestBody::VT_TYPE_, type_, 0);
+  }
+  #[inline]
+  pub fn add_aggregate_id(&mut self, aggregate_id: flatbuffers::WIPOffset<flatbuffers::Vector<'b , u8>>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(InsertEventRequestBody::VT_AGGREGATE_ID, aggregate_id);
+  }
+  #[inline]
+  pub fn add_aggregate_version(&mut self, aggregate_version: u32) {
+    self.fbb_.push_slot::<u32>(InsertEventRequestBody::VT_AGGREGATE_VERSION, aggregate_version, 0);
+  }
+  #[inline]
+  pub fn add_body(&mut self, body: flatbuffers::WIPOffset<flatbuffers::Vector<'b , u8>>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(InsertEventRequestBody::VT_BODY, body);
+  }
+  #[inline]
+  pub fn add_meta(&mut self, meta: flatbuffers::WIPOffset<flatbuffers::Vector<'b , u8>>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(InsertEventRequestBody::VT_META, meta);
+  }
+  #[inline]
+  pub fn add_timestamp(&mut self, timestamp: u32) {
+    self.fbb_.push_slot::<u32>(InsertEventRequestBody::VT_TIMESTAMP, timestamp, 0);
   }
   #[inline]
   pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> InsertEventRequestBodyBuilder<'a, 'b> {
@@ -356,40 +406,182 @@ impl<'a: 'b, 'b> InsertEventRequestBodyBuilder<'a, 'b> {
 impl core::fmt::Debug for InsertEventRequestBody<'_> {
   fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
     let mut ds = f.debug_struct("InsertEventRequestBody");
-      ds.field("event", &self.event());
+      ds.field("id", &self.id());
+      ds.field("type_", &self.type_());
+      ds.field("aggregate_id", &self.aggregate_id());
+      ds.field("aggregate_version", &self.aggregate_version());
+      ds.field("body", &self.body());
+      ds.field("meta", &self.meta());
+      ds.field("timestamp", &self.timestamp());
       ds.finish()
   }
 }
-pub enum ListAggregateEventsRequestBodyOffset {}
+pub enum InsertEventsRequestBodyOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
-pub struct ListAggregateEventsRequestBody<'a> {
+pub struct InsertEventsRequestBody<'a> {
   pub _tab: flatbuffers::Table<'a>,
 }
 
-impl<'a> flatbuffers::Follow<'a> for ListAggregateEventsRequestBody<'a> {
-  type Inner = ListAggregateEventsRequestBody<'a>;
+impl<'a> flatbuffers::Follow<'a> for InsertEventsRequestBody<'a> {
+  type Inner = InsertEventsRequestBody<'a>;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
     Self { _tab: flatbuffers::Table { buf, loc } }
   }
 }
 
-impl<'a> ListAggregateEventsRequestBody<'a> {
+impl<'a> InsertEventsRequestBody<'a> {
+  pub const VT_AGGREGATE_ID: flatbuffers::VOffsetT = 4;
+  pub const VT_AGGREGATE_VERSION: flatbuffers::VOffsetT = 6;
+  pub const VT_TIMESTAMP: flatbuffers::VOffsetT = 8;
+  pub const VT_EVENTS: flatbuffers::VOffsetT = 10;
+
+  #[inline]
+  pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+    InsertEventsRequestBody { _tab: table }
+  }
+  #[allow(unused_mut)]
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+    args: &'args InsertEventsRequestBodyArgs<'args>
+  ) -> flatbuffers::WIPOffset<InsertEventsRequestBody<'bldr>> {
+    let mut builder = InsertEventsRequestBodyBuilder::new(_fbb);
+    if let Some(x) = args.events { builder.add_events(x); }
+    builder.add_timestamp(args.timestamp);
+    builder.add_aggregate_version(args.aggregate_version);
+    if let Some(x) = args.aggregate_id { builder.add_aggregate_id(x); }
+    builder.finish()
+  }
+
+
+  #[inline]
+  pub fn aggregate_id(&self) -> Option<&'a [u8]> {
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(InsertEventsRequestBody::VT_AGGREGATE_ID, None).map(|v| v.safe_slice())
+  }
+  #[inline]
+  pub fn aggregate_version(&self) -> u32 {
+    self._tab.get::<u32>(InsertEventsRequestBody::VT_AGGREGATE_VERSION, Some(0)).unwrap()
+  }
+  #[inline]
+  pub fn timestamp(&self) -> u32 {
+    self._tab.get::<u32>(InsertEventsRequestBody::VT_TIMESTAMP, Some(0)).unwrap()
+  }
+  #[inline]
+  pub fn events(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<InsertEventsRequestBodyEvent<'a>>>> {
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<InsertEventsRequestBodyEvent>>>>(InsertEventsRequestBody::VT_EVENTS, None)
+  }
+}
+
+impl flatbuffers::Verifiable for InsertEventsRequestBody<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut flatbuffers::Verifier, pos: usize
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    use self::flatbuffers::Verifiable;
+    v.visit_table(pos)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("aggregate_id", Self::VT_AGGREGATE_ID, false)?
+     .visit_field::<u32>("aggregate_version", Self::VT_AGGREGATE_VERSION, false)?
+     .visit_field::<u32>("timestamp", Self::VT_TIMESTAMP, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<InsertEventsRequestBodyEvent>>>>("events", Self::VT_EVENTS, false)?
+     .finish();
+    Ok(())
+  }
+}
+pub struct InsertEventsRequestBodyArgs<'a> {
+    pub aggregate_id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub aggregate_version: u32,
+    pub timestamp: u32,
+    pub events: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<InsertEventsRequestBodyEvent<'a>>>>>,
+}
+impl<'a> Default for InsertEventsRequestBodyArgs<'a> {
+  #[inline]
+  fn default() -> Self {
+    InsertEventsRequestBodyArgs {
+      aggregate_id: None,
+      aggregate_version: 0,
+      timestamp: 0,
+      events: None,
+    }
+  }
+}
+
+pub struct InsertEventsRequestBodyBuilder<'a: 'b, 'b> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+  start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> InsertEventsRequestBodyBuilder<'a, 'b> {
+  #[inline]
+  pub fn add_aggregate_id(&mut self, aggregate_id: flatbuffers::WIPOffset<flatbuffers::Vector<'b , u8>>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(InsertEventsRequestBody::VT_AGGREGATE_ID, aggregate_id);
+  }
+  #[inline]
+  pub fn add_aggregate_version(&mut self, aggregate_version: u32) {
+    self.fbb_.push_slot::<u32>(InsertEventsRequestBody::VT_AGGREGATE_VERSION, aggregate_version, 0);
+  }
+  #[inline]
+  pub fn add_timestamp(&mut self, timestamp: u32) {
+    self.fbb_.push_slot::<u32>(InsertEventsRequestBody::VT_TIMESTAMP, timestamp, 0);
+  }
+  #[inline]
+  pub fn add_events(&mut self, events: flatbuffers::WIPOffset<flatbuffers::Vector<'b , flatbuffers::ForwardsUOffset<InsertEventsRequestBodyEvent<'b >>>>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(InsertEventsRequestBody::VT_EVENTS, events);
+  }
+  #[inline]
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> InsertEventsRequestBodyBuilder<'a, 'b> {
+    let start = _fbb.start_table();
+    InsertEventsRequestBodyBuilder {
+      fbb_: _fbb,
+      start_: start,
+    }
+  }
+  #[inline]
+  pub fn finish(self) -> flatbuffers::WIPOffset<InsertEventsRequestBody<'a>> {
+    let o = self.fbb_.end_table(self.start_);
+    flatbuffers::WIPOffset::new(o.value())
+  }
+}
+
+impl core::fmt::Debug for InsertEventsRequestBody<'_> {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    let mut ds = f.debug_struct("InsertEventsRequestBody");
+      ds.field("aggregate_id", &self.aggregate_id());
+      ds.field("aggregate_version", &self.aggregate_version());
+      ds.field("timestamp", &self.timestamp());
+      ds.field("events", &self.events());
+      ds.finish()
+  }
+}
+pub enum ListEventsRequestBodyOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct ListEventsRequestBody<'a> {
+  pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for ListEventsRequestBody<'a> {
+  type Inner = ListEventsRequestBody<'a>;
+  #[inline]
+  fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    Self { _tab: flatbuffers::Table { buf, loc } }
+  }
+}
+
+impl<'a> ListEventsRequestBody<'a> {
   pub const VT_AGGREGATE_ID: flatbuffers::VOffsetT = 4;
   pub const VT_AGGREGATE_VERSION: flatbuffers::VOffsetT = 6;
   pub const VT_LIMIT: flatbuffers::VOffsetT = 8;
 
   #[inline]
   pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-    ListAggregateEventsRequestBody { _tab: table }
+    ListEventsRequestBody { _tab: table }
   }
   #[allow(unused_mut)]
   pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
     _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-    args: &'args ListAggregateEventsRequestBodyArgs<'args>
-  ) -> flatbuffers::WIPOffset<ListAggregateEventsRequestBody<'bldr>> {
-    let mut builder = ListAggregateEventsRequestBodyBuilder::new(_fbb);
+    args: &'args ListEventsRequestBodyArgs<'args>
+  ) -> flatbuffers::WIPOffset<ListEventsRequestBody<'bldr>> {
+    let mut builder = ListEventsRequestBodyBuilder::new(_fbb);
     builder.add_limit(args.limit);
     builder.add_aggregate_version(args.aggregate_version);
     if let Some(x) = args.aggregate_id { builder.add_aggregate_id(x); }
@@ -399,19 +591,19 @@ impl<'a> ListAggregateEventsRequestBody<'a> {
 
   #[inline]
   pub fn aggregate_id(&self) -> Option<&'a [u8]> {
-    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(ListAggregateEventsRequestBody::VT_AGGREGATE_ID, None).map(|v| v.safe_slice())
+    self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(ListEventsRequestBody::VT_AGGREGATE_ID, None).map(|v| v.safe_slice())
   }
   #[inline]
   pub fn aggregate_version(&self) -> u32 {
-    self._tab.get::<u32>(ListAggregateEventsRequestBody::VT_AGGREGATE_VERSION, Some(0)).unwrap()
+    self._tab.get::<u32>(ListEventsRequestBody::VT_AGGREGATE_VERSION, Some(0)).unwrap()
   }
   #[inline]
   pub fn limit(&self) -> u32 {
-    self._tab.get::<u32>(ListAggregateEventsRequestBody::VT_LIMIT, Some(0)).unwrap()
+    self._tab.get::<u32>(ListEventsRequestBody::VT_LIMIT, Some(0)).unwrap()
   }
 }
 
-impl flatbuffers::Verifiable for ListAggregateEventsRequestBody<'_> {
+impl flatbuffers::Verifiable for ListEventsRequestBody<'_> {
   #[inline]
   fn run_verifier(
     v: &mut flatbuffers::Verifier, pos: usize
@@ -425,15 +617,15 @@ impl flatbuffers::Verifiable for ListAggregateEventsRequestBody<'_> {
     Ok(())
   }
 }
-pub struct ListAggregateEventsRequestBodyArgs<'a> {
+pub struct ListEventsRequestBodyArgs<'a> {
     pub aggregate_id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub aggregate_version: u32,
     pub limit: u32,
 }
-impl<'a> Default for ListAggregateEventsRequestBodyArgs<'a> {
+impl<'a> Default for ListEventsRequestBodyArgs<'a> {
   #[inline]
   fn default() -> Self {
-    ListAggregateEventsRequestBodyArgs {
+    ListEventsRequestBodyArgs {
       aggregate_id: None,
       aggregate_version: 0,
       limit: 0,
@@ -441,41 +633,41 @@ impl<'a> Default for ListAggregateEventsRequestBodyArgs<'a> {
   }
 }
 
-pub struct ListAggregateEventsRequestBodyBuilder<'a: 'b, 'b> {
+pub struct ListEventsRequestBodyBuilder<'a: 'b, 'b> {
   fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
   start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> ListAggregateEventsRequestBodyBuilder<'a, 'b> {
+impl<'a: 'b, 'b> ListEventsRequestBodyBuilder<'a, 'b> {
   #[inline]
   pub fn add_aggregate_id(&mut self, aggregate_id: flatbuffers::WIPOffset<flatbuffers::Vector<'b , u8>>) {
-    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(ListAggregateEventsRequestBody::VT_AGGREGATE_ID, aggregate_id);
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(ListEventsRequestBody::VT_AGGREGATE_ID, aggregate_id);
   }
   #[inline]
   pub fn add_aggregate_version(&mut self, aggregate_version: u32) {
-    self.fbb_.push_slot::<u32>(ListAggregateEventsRequestBody::VT_AGGREGATE_VERSION, aggregate_version, 0);
+    self.fbb_.push_slot::<u32>(ListEventsRequestBody::VT_AGGREGATE_VERSION, aggregate_version, 0);
   }
   #[inline]
   pub fn add_limit(&mut self, limit: u32) {
-    self.fbb_.push_slot::<u32>(ListAggregateEventsRequestBody::VT_LIMIT, limit, 0);
+    self.fbb_.push_slot::<u32>(ListEventsRequestBody::VT_LIMIT, limit, 0);
   }
   #[inline]
-  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> ListAggregateEventsRequestBodyBuilder<'a, 'b> {
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> ListEventsRequestBodyBuilder<'a, 'b> {
     let start = _fbb.start_table();
-    ListAggregateEventsRequestBodyBuilder {
+    ListEventsRequestBodyBuilder {
       fbb_: _fbb,
       start_: start,
     }
   }
   #[inline]
-  pub fn finish(self) -> flatbuffers::WIPOffset<ListAggregateEventsRequestBody<'a>> {
+  pub fn finish(self) -> flatbuffers::WIPOffset<ListEventsRequestBody<'a>> {
     let o = self.fbb_.end_table(self.start_);
     flatbuffers::WIPOffset::new(o.value())
   }
 }
 
-impl core::fmt::Debug for ListAggregateEventsRequestBody<'_> {
+impl core::fmt::Debug for ListEventsRequestBody<'_> {
   fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-    let mut ds = f.debug_struct("ListAggregateEventsRequestBody");
+    let mut ds = f.debug_struct("ListEventsRequestBody");
       ds.field("aggregate_id", &self.aggregate_id());
       ds.field("aggregate_version", &self.aggregate_version());
       ds.field("limit", &self.limit());
@@ -537,9 +729,9 @@ impl<'a> Request<'a> {
 
   #[inline]
   #[allow(non_snake_case)]
-  pub fn body_as_list_aggregate_events(&self) -> Option<ListAggregateEventsRequestBody<'a>> {
-    if self.body_type() == RequestBody::ListAggregateEvents {
-      self.body().map(ListAggregateEventsRequestBody::init_from_table)
+  pub fn body_as_list_events(&self) -> Option<ListEventsRequestBody<'a>> {
+    if self.body_type() == RequestBody::ListEvents {
+      self.body().map(ListEventsRequestBody::init_from_table)
     } else {
       None
     }
@@ -557,7 +749,7 @@ impl flatbuffers::Verifiable for Request<'_> {
      .visit_union::<RequestBody, _>("body_type", Self::VT_BODY_TYPE, "body", Self::VT_BODY, false, |key, v, pos| {
         match key {
           RequestBody::InsertEvent => v.verify_union_variant::<flatbuffers::ForwardsUOffset<InsertEventRequestBody>>("RequestBody::InsertEvent", pos),
-          RequestBody::ListAggregateEvents => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ListAggregateEventsRequestBody>>("RequestBody::ListAggregateEvents", pos),
+          RequestBody::ListEvents => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ListEventsRequestBody>>("RequestBody::ListEvents", pos),
           _ => Ok(()),
         }
      })?
@@ -619,8 +811,8 @@ impl core::fmt::Debug for Request<'_> {
             ds.field("body", &"InvalidFlatbuffer: Union discriminant does not match value.")
           }
         },
-        RequestBody::ListAggregateEvents => {
-          if let Some(x) = self.body_as_list_aggregate_events() {
+        RequestBody::ListEvents => {
+          if let Some(x) = self.body_as_list_events() {
             ds.field("body", &x)
           } else {
             ds.field("body", &"InvalidFlatbuffer: Union discriminant does not match value.")
